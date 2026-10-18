@@ -44,5 +44,7 @@ extern _windowinfo windowinfo;
 
 /* 4:3 render area inside the full framebuffer (initialized in main.c) */
 extern int renderareax, renderareay, renderareaw, renderareah;
+extern int hudareax, hudareay, hudareaw, hudareah;
+extern float hudfrustumscale;
 
 #endif /* GISH_SDL_EVENT_H */

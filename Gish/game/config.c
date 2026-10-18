@@ -137,7 +137,7 @@ void loadconfig(void)
   config.stencilbits = 8;
   config.sound       = 1;
   config.music       = 1;
-  config.keepaspect  = 1;
+  config.keepaspect  = 2; /* 0=stretch, 1=4:3 bars, 2=expand (wider view, square pixels) */
   config.turbomode   = 0;
 #ifndef ANDROID_NDK
   config.joystick = 1;

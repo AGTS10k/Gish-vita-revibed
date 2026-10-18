@@ -325,11 +325,11 @@ void setuptextdisplay(void)
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-  glViewport(renderareax, renderareay, renderareaw, renderareah);
+  glViewport(hudareax, hudareay, hudareaw, hudareah);
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  glFrustum(-1.0f, 1.0f, -0.75f, 0.75f, 1.0f, 1000.0f);
+  glFrustum(-hudfrustumscale, hudfrustumscale, -0.75f, 0.75f, 1.0f, 1000.0f);
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();

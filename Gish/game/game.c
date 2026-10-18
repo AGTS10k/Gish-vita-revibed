@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../config.h"
 #include "../game/animation.h"
 #include "../game/boss.h"
+#include "../game/config.h"
 #include "../game/custom.h"
 #include "../game/editor.h"
 #include "../game/english.h"
@@ -412,11 +413,23 @@ void gameloop(void)
     if (view.zoom < 4.0f)
       view.zoom = 4.0f;
 
-    view.zoomx = view.zoom + 0.5f;
     view.zoomy = view.zoom * 0.80f + 0.5f;
     // view.zoomy=view.zoom*0.5625f+0.5f;
+    disable_frame = (config.keepaspect == 2);
 
-    setuporthoviewport(0, 0, 640, 480, view.zoom, view.zoom * 0.75f, 20.0f);
+    if (config.keepaspect == 2 && !game.oldschool)
+    {
+      /* expand mode: widen the world box to the render area aspect for square pixels */
+      float halfwidth = view.zoom * 0.75f * (float)renderareaw / (float)renderareah;
+
+      view.zoomx = halfwidth + 0.5f;
+      setuporthoviewport(0, 0, 640, 480, halfwidth, view.zoom * 0.75f, 20.0f);
+    }
+    else
+    {
+      view.zoomx = view.zoom + 0.5f;
+      setuporthoviewport(0, 0, 640, 480, view.zoom, view.zoom * 0.75f, 20.0f);
+    }
     // setuporthoviewport(0,0,640,480,view.zoom,view.zoom*0.5625f,20.0f);
     setupviewpoint(view.position, view.orientation);
 
@@ -523,6 +536,8 @@ void gameloop(void)
     if (game.exit == GAMEEXIT_WON || game.exit == GAMEXIT_WARPZONE)
     {
       glDisable(GL_TEXTURE_2D);
+      glMatrixMode(GL_MODELVIEW);
+      glScalef(hudfrustumscale, 1.0f, 1.0f);
 
 #if !defined(GLES)
       glBegin(GL_QUADS);
@@ -542,11 +557,16 @@ void gameloop(void)
 
       glEnd();
 #endif
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
+      glMatrixMode(GL_TEXTURE);
       glEnable(GL_TEXTURE_2D);
     }
     if (game.exit == GAMEEXIT_DIED)
     {
       glDisable(GL_TEXTURE_2D);
+      glMatrixMode(GL_MODELVIEW);
+      glScalef(hudfrustumscale, 1.0f, 1.0f);
 
 #if !defined(GLES)
       glBegin(GL_QUADS);
@@ -569,6 +589,9 @@ void gameloop(void)
 
       glEnd();
 #endif
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
+      glMatrixMode(GL_TEXTURE);
       glEnable(GL_TEXTURE_2D);
     }
 
@@ -598,6 +621,8 @@ void gameloop(void)
       if (game.exitdelay < 20)
       {
         glDisable(GL_TEXTURE_2D);
+        glMatrixMode(GL_MODELVIEW);
+        glScalef(hudfrustumscale, 1.0f, 1.0f);
 #if !defined(GLES)
         glBegin(GL_QUADS);
 #endif
@@ -616,6 +641,9 @@ void gameloop(void)
 
         glEnd();
 #endif
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        glMatrixMode(GL_TEXTURE);
         glEnable(GL_TEXTURE_2D);
       }
     if (movie.record)

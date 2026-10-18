@@ -57,6 +57,8 @@ char *gishDataPath = (char *)"ux0:/data/gish/";
 
 /* 4:3 render area inside the full framebuffer */
 int renderareax, renderareay, renderareaw, renderareah;
+int hudareax, hudareay, hudareaw, hudareah;
+float hudfrustumscale = 1.0f;
 
 int main(int argc, char *argv[])
 {
@@ -188,7 +190,7 @@ int main(int argc, char *argv[])
   font.sizex      = 640;
   font.sizey      = 480;
 
-  if (config.keepaspect)
+  if (config.keepaspect == 1)
   {
     /* 4:3 render area: width 725 fits the 960x544 framebuffer (544*4/3), centered */
     renderareaw = 725;
@@ -198,11 +200,31 @@ int main(int argc, char *argv[])
   }
   else
   {
-    /* stretched: use the whole framebuffer (pre-4:3-change behavior) */
+    /* stretched (0) or expanded (2): use the whole framebuffer */
     renderareax = 0;
     renderareay = 0;
     renderareaw = windowinfo.resolutionx;
     renderareah = windowinfo.resolutiony;
+  }
+
+  if (config.keepaspect == 2)
+  {
+    /* expand mode: HUD viewport covers the whole screen, but the text frustum is widened by
+       hudfrustumscale so the 640x480 text space still lands in the centered 725px strip */
+    hudareax = 0;
+    hudareay = 0;
+    hudareaw = windowinfo.resolutionx;
+    hudareah = windowinfo.resolutiony;
+    hudfrustumscale = (float)windowinfo.resolutionx / 725.0f;
+  }
+  else
+  {
+    /* HUD follows the render area (stretch: full screen, letterbox: the 4:3 strip) */
+    hudareax = renderareax;
+    hudareay = renderareay;
+    hudareaw = renderareaw;
+    hudareah = renderareah;
+    hudfrustumscale = 1.0f;
   }
 
   loadtexturetga_app(1000, "font00.tga", 0, GL_CLAMP, GL_CLAMP, GL_LINEAR, GL_LINEAR);
