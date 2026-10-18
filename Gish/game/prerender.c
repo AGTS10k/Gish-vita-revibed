@@ -53,8 +53,8 @@ void setuprenderobjects(void)
       if (object[count].type == 8)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type  = 8;
             objectrender[numofobjectrenders].depth = -1.0f;
@@ -151,8 +151,8 @@ void setuprenderobjects(void)
       if (object[count].type == 10)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type       = 2;
             objectrender[numofobjectrenders].depth      = 2.0f;
@@ -251,8 +251,8 @@ void setuprenderobjects(void)
       if (object[count].type == 1)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type       = 1;
             objectrender[numofobjectrenders].depth      = 0.0f;
@@ -369,8 +369,8 @@ void setuprenderobjects(void)
       if (object[count].type == 2 || object[count].type == 20)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type       = 2;
             objectrender[numofobjectrenders].depth      = 2.0f;
@@ -469,8 +469,8 @@ void setuprenderobjects(void)
       if (object[count].type == 3)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type       = 3;
             objectrender[numofobjectrenders].depth      = 1.0f;
@@ -514,8 +514,8 @@ void setuprenderobjects(void)
       if (object[count].type == 4)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type       = 4;
             objectrender[numofobjectrenders].depth      = 1.0f;
@@ -573,8 +573,8 @@ void setuprenderobjects(void)
     if (boss[count].texturenum != 0)
     {
       subtractvectors(vec, view.position, boss[count].position);
-      if (fabs(vec[0]) - 4.0f < (view.zoomx + 1))
-        if (fabs(vec[1]) - 4.0f < (view.zoomy + 1))
+      if (fabs(vec[0]) - 4.0f < (view.zoomx + 2))
+        if (fabs(vec[1]) - 4.0f < (view.zoomy + 2))
         {
           objectrender[numofobjectrenders].type       = 4;
           objectrender[numofobjectrenders].depth      = 1.0f;
@@ -637,8 +637,8 @@ void setuprenderobjects(void)
       if (object[count].type == 5 || object[count].type == 6)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type       = 5;
             objectrender[numofobjectrenders].depth      = 1.1f;
@@ -691,8 +691,8 @@ void setuprenderobjects(void)
       if (object[count].type == 9)
       {
         subtractvectors(vec, view.position, object[count].position);
-        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 1))
-          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 1))
+        if (fabs(vec[0]) - object[count].radius < (view.zoomx + 2))
+          if (fabs(vec[1]) - object[count].radius < (view.zoomy + 2))
           {
             objectrender[numofobjectrenders].type       = 9;
             objectrender[numofobjectrenders].depth      = 2.0f;
@@ -746,8 +746,8 @@ void setuprenderobjects(void)
         scale = bond[rope[count].bondnum].length + 1.0f;
 
       subtractvectors(vec, view.position, particle[rope[count].part1].position);
-      if (fabs(vec[0]) - scale < (view.zoomx + 1))
-        if (fabs(vec[1]) - scale < (view.zoomy + 1))
+      if (fabs(vec[0]) - scale < (view.zoomx + 2))
+        if (fabs(vec[1]) - scale < (view.zoomy + 2))
         {
           objectrender[numofobjectrenders].type       = 32;
           objectrender[numofobjectrenders].depth      = 3.0f + (float)count / 1000.0f;

@@ -410,6 +410,16 @@ void loadbackground(int texturenum, char *filename)
 
 void displaybackground(int texturenum)
 {
+  if (hudfrustumscale > 1.0f)
+  {
+    /* expand mode: the wider HUD frustum would let this quad spill past the 4:3 strip
+       into the side strips (its eye coords reach x = +1.56); clip it back to the strip */
+    int stripw = (windowinfo.resolutiony * 4) / 3;
+
+    glEnable(GL_SCISSOR_TEST);
+    glScissor((windowinfo.resolutionx - stripw) / 2, 0, stripw, windowinfo.resolutiony);
+  }
+
   drawbackground(texturenum, 0, 0, 256, 256, 800, 600);
   drawbackground(texturenum + 1, 256, 0, 256, 256, 800, 600);
   drawbackground(texturenum + 2, 512, 0, 256, 256, 800, 600);
@@ -422,6 +432,9 @@ void displaybackground(int texturenum)
   drawbackground(texturenum + 9, 256, 512, 256, 256, 800, 600);
   drawbackground(texturenum + 10, 512, 512, 256, 256, 800, 600);
   drawbackground(texturenum + 11, 768, 512, 256, 256, 800, 600);
+
+  if (hudfrustumscale > 1.0f)
+    glDisable(GL_SCISSOR_TEST);
 }
 
 void versusmenu(void)
