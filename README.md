@@ -10,15 +10,14 @@ The port uses SDL2, PVR_PSP2, OpenAL, and Ogg Vorbis libraries.
 **_Full disclaimer_**: all changes made here **were done by AI** (Qwen3.8-27B local model running on an RTX 3090 in my personal PC, then DeepSeek V4.1 Flash Free courtesy of OpenCode). While each change was directed and reviewed by me, I'm not able to code in C myself - only understand what the model did, to some extent. I tested the game after each change, but haven't completed it fully. If you encounter any bugs or other issues, please report it, and I will try to fix or workaround it.
 
 ## Download
-
 You can download an installable VPK from the [Releases](https://github.com/AGTS10k/Gish-vita-revibed/releases) section. This VPK will install over the original port.
 You need data files from Gish 1.6 (non-steam, MS Windows), Gish 1.53 (non-steam, Linux) or Gish 1.7 (steam version).
 Steam 1.7 can be obtained by selecting `version170` in "betas".
 
-Copy data to `ux0:/data/gish/`
+Copy data to `ux0:/data/gish/`.
 
 ## Screenshots
-<img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/b7f9051c-8672-4e66-ab92-4b27e4a9b29f" /><img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/e4a6fa61-e4c7-4141-a911-e6ff7288594a" /><img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/c214f013-4eb4-4a7b-ae88-ba029744d805" /><img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/0eff0f9e-b6fe-41ad-be83-1d0a18772021" />
+<img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/b7f9051c-8672-4e66-ab92-4b27e4a9b29f" /><img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/e4a6fa61-e4c7-4141-a911-e6ff7288594a" /><img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/d17bb3a0-68b1-42ad-9279-5281ad237bfa" /><img width="960" height="544" alt="image" src="https://github.com/user-attachments/assets/0eff0f9e-b6fe-41ad-be83-1d0a18772021" />
 
 ## Credits
 * [isage](https://github.com/isage) for the original port.
