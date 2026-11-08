@@ -29,6 +29,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 int numofjoysticks;
 SDL_Joystick *joy[16];
 
+/* Stick deflection that still counts as centred. 5000/32767 = 15.3%; the
+   original 10000 (30.5%) made the stick feel unresponsive near centre. */
+#define JOYSTICK_DEADZONE 5000
+
 int joystickenabled;
 int joystickused;
 
@@ -56,13 +60,13 @@ void checkjoystick(void)
 
       joystick[count].axis[0] = 0.0f;
       joystick[count].axis[1] = 0.0f;
-      if (joystick[count].x < -10000)
+      if (joystick[count].x < -JOYSTICK_DEADZONE)
         joystick[count].axis[0] = -1.0f;
-      if (joystick[count].x > 10000)
+      if (joystick[count].x > JOYSTICK_DEADZONE)
         joystick[count].axis[0] = 1.0f;
-      if (joystick[count].y < -10000)
+      if (joystick[count].y < -JOYSTICK_DEADZONE)
         joystick[count].axis[1] = 1.0f;
-      if (joystick[count].y > 10000)
+      if (joystick[count].y > JOYSTICK_DEADZONE)
         joystick[count].axis[1] = -1.0f;
 
       if (joystick[count].numofhats > 0)
