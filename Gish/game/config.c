@@ -185,8 +185,8 @@ void loadconfig(void)
   control[0].button[3] = 8;
   control[0].button[4] = 3;
   control[0].button[5] = 2;
-  control[0].button[6] = 0;
-  control[0].button[7] = 1;
+  control[0].button[6] = 1;
+  control[0].button[7] = 5;
 
   control[0].button[8] = 11;
 
