@@ -152,6 +152,11 @@ void loadconfig(void)
      default 20 ms step) so every drawn frame is a fresh sim state.  0 = render
      as fast as the display allows (default, the original behaviour). */
   config.fpslimiter = 0;
+  /* Frame interpolation: 1 = the renderer blends the camera, the objects and
+     the particles between the previous and the current simulation step instead
+     of drawing the stepped positions (default).  0 = draw the raw stepped
+     state, the original behaviour. */
+  config.frameinterpolation = 1;
 #ifndef ANDROID_NDK
   config.joystick = 1;
 #ifdef __vita__
@@ -234,6 +239,7 @@ void loadconfig(void)
   optionreadint(&config.shadows, "shadows=");
   optionreadint(&config.warpzonepixelation, "warpzonepixelation=");
   optionreadint(&config.fpslimiter, "fpslimiter=");
+  optionreadint(&config.frameinterpolation, "frameinterpolation=");
 
   optionreadint(&option.sound, "soundon=");
   optionreadint(&option.music, "musicon=");
@@ -313,6 +319,7 @@ void saveconfig(void)
      boot, so an option that is only read would erase the user's setting. */
   optionwriteint(fp, &config.warpzonepixelation, "warpzonepixelation=");
   optionwriteint(fp, &config.fpslimiter, "fpslimiter=");
+  optionwriteint(fp, &config.frameinterpolation, "frameinterpolation=");
 
   optionwriteint(fp, &option.sound, "soundon=");
   optionwriteint(fp, &option.music, "musicon=");

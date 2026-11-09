@@ -79,6 +79,14 @@ int fix_boss_logic_when_lights_off = 0;
 
 int fps, fps_cache = 0, fps_renew = 0, fps_mean;
 
+/* Render-time frame interpolation (config.txt: frameinterpolation=1).  The
+   renderer draws between the previous and the current simulation step, so the
+   stepped positions are saved here while the blended ones are drawn and put
+   back once the frame's world drawing is done.  The sizes match particle[16384]
+   (physics/particle.h) and object[512] (game/gameobject.h). */
+static float particlepossave[16384][3];
+static float objectpossave[512][3];
+
 #if defined(GISH_INSTRUMENT)
 /* ---------------------------------------------------------------------------
    PERF INSTRUMENTATION - simulation breakdown
@@ -188,6 +196,12 @@ void gameloop(void)
   unsigned int simtimer;
   int simcount;
   int frametimer;
+  /* Frame interpolation (frameinterpolation): viewposprev is where the camera
+     was before the last simulation step, viewposdraw the stepped position the
+     renderer works from, cameraalpha how far this frame is between them. */
+  float viewposprev[2] = {0.0f, 0.0f};
+  float viewposdraw[2] = {0.0f, 0.0f};
+  float cameraalpha     = 1.0f;
   // float vec[3];
   // char filename[13]="text000.tga";
   int scorenum;
@@ -597,6 +611,150 @@ void gameloop(void)
       setuporthoviewport(0, 0, 640, 480, view.zoom, view.zoom * 0.75f, 20.0f);
     }
     // setuporthoviewport(0,0,640,480,view.zoom,view.zoom*0.5625f,20.0f);
+    /* ---- simulation ------------------------------------------------------
+       Runs before the render so the frame below draws the state this step just
+       produced; the renderer then blends the camera between the previous and
+       the current step (frameinterpolation). */
+#if defined(GISH_INSTRUMENT)
+    perf_t_sim0 = SDL_GetPerformanceCounter();
+#endif
+    simcount      = 0;
+    game.simspeed = 20;
+    if (game.turbomode)
+      game.simspeed = 15;
+
+    /* Optional frame limiter (config.txt: fpslimiter=1).  Waits until the next
+       simulation tick is due before rendering, so the frame rate matches the
+       sim rate (50 fps at the default 20 ms step) and every drawn frame is a
+       fresh state.  Skipped in turbo mode: there the sim asks for 66.7 fps,
+       which is already above the 60 Hz display, so a wait would only make the
+       sim fall behind and the accumulator start running double steps. */
+    if (config.fpslimiter && !game.turbomode)
+      while (SDL_GetTicks() - simtimer <= game.simspeed)
+        SDL_Delay(1);
+
+    while (SDL_GetTicks() - simtimer > game.simspeed && simcount < 3)
+    {
+      simcount++;
+      count    = SDL_GetTicks() - simtimer - game.simspeed;
+      simtimer = SDL_GetTicks() - count;
+      if (simcount == 3)
+        simtimer = SDL_GetTicks();
+
+      if (game.exitdelay > 0)
+        if (!game.editing)
+          game.exitdelay--;
+      if (keyboard[SCAN_ESC])
+        game.exitdelay = 0;
+
+      if (game.exit == GAMEEXIT_NONE && !game.pause && game.dialog == 0 && !game.over)
+      {
+        getinputs();
+
+        if (!game.playreplay)
+          saveinputs();
+        else
+          loadinputs();
+
+#if defined(GISH_INSTRUMENT)
+        perf_simtick = SDL_GetPerformanceCounter();
+#endif
+        if (game.startdelay == 0)
+          simulation();
+        /* gamelogic() is what moves the camera: remember where it was. */
+        viewposprev[0] = view.position[0];
+        viewposprev[1] = view.position[1];
+        gamelogic();
+        PERF_SIM(PERFSIM_LOGIC);
+      }
+    }
+#if defined(GISH_INSTRUMENT)
+    perf_t_sim1 = SDL_GetPerformanceCounter();
+    {
+      Uint64 dt = perf_t_sim1 - perf_t_sim0;
+      perf_render += perf_t_sim0 - perf_now;
+      perf_sim    += dt;
+      if (dt > perf_sim_max)
+        perf_sim_max = dt;
+      perf_steps  += simcount;
+      if (simcount >= 3)
+        perf_catchup++;
+    }
+#endif
+
+    /* How far this frame is into the next simulation step, 0..1.  simtimer is
+       the accumulator anchor, so (now - simtimer) is the leftover the loop
+       above did not consume.  With the frame limiter on, the step and the frame
+       already happen together, so there is nothing to blend. */
+    cameraalpha = 1.0f;
+    if (config.frameinterpolation && !config.fpslimiter && game.simspeed != 0)
+    {
+      unsigned int elapsed = SDL_GetTicks() - simtimer;
+
+      if (elapsed > game.simspeed)
+        elapsed = game.simspeed;
+      cameraalpha = (float)elapsed / (float)game.simspeed;
+    }
+    {
+      float dx = view.position[0] - viewposprev[0];
+      float dy = view.position[1] - viewposprev[1];
+
+      /* Further than a few steps apart is a teleport (level change, warp zone,
+         respawn), not motion: draw the new position straight away. */
+      if (dx * dx + dy * dy > 16.0f)
+        cameraalpha = 1.0f;
+    }
+
+    /* Blend the world for this frame.  prevposition is where each thing was
+       before the last simulation step, its position where it is now, and
+       cameraalpha how far this frame is between the two.  The stepped values
+       are saved and put back after the last world draw, so the simulation and
+       the game logic never see the blend. */
+    viewposdraw[0] = view.position[0];
+    viewposdraw[1] = view.position[1];
+    if (cameraalpha < 1.0f)
+    {
+      float k = 1.0f - cameraalpha;
+
+      view.position[0] = viewposdraw[0] - (viewposdraw[0] - viewposprev[0]) * k;
+      view.position[1] = viewposdraw[1] - (viewposdraw[1] - viewposprev[1]) * k;
+
+      for (count = 0; count < numofparticles; count++)
+      {
+        float dx = particle[count].position[0] - particle[count].prevposition[0];
+        float dy = particle[count].position[1] - particle[count].prevposition[1];
+        float dz = particle[count].position[2] - particle[count].prevposition[2];
+
+        particlepossave[count][0] = particle[count].position[0];
+        particlepossave[count][1] = particle[count].position[1];
+        particlepossave[count][2] = particle[count].position[2];
+        /* A jump this large is not motion (respawn, teleport): draw it as is. */
+        if (dx * dx + dy * dy < 64.0f)
+        {
+          particle[count].position[0] -= dx * k;
+          particle[count].position[1] -= dy * k;
+          particle[count].position[2] -= dz * k;
+        }
+      }
+
+      for (count = 0; count < numofobjects; count++)
+      {
+        float dx = object[count].position[0] - object[count].prevposition[0];
+        float dy = object[count].position[1] - object[count].prevposition[1];
+        float dz = object[count].position[2] - object[count].prevposition[2];
+
+        objectpossave[count][0] = object[count].position[0];
+        objectpossave[count][1] = object[count].position[1];
+        objectpossave[count][2] = object[count].position[2];
+        if (dx * dx + dy * dy < 16.0f)
+        {
+          object[count].position[0] -= dx * k;
+          object[count].position[1] -= dy * k;
+          object[count].position[2] -= dz * k;
+        }
+      }
+    }
+
     setupviewpoint(view.position, view.orientation);
 
     /* Retro pixelation (config.txt: warpzonepixelation=).  When it is on, the
@@ -807,6 +965,27 @@ void gameloop(void)
     if (game.oldschool == 0 && !game.bosslevel && level.gametype != GAMETYPE_2COLLECTION)
       rendersprites();
 
+    /* The last draw that uses world positions is done: put the true stepped
+       values back.  The simulation, the game logic and the next frame's step
+       must all work from these, never from the blend. */
+    if (cameraalpha < 1.0f)
+    {
+      for (count = 0; count < numofparticles; count++)
+      {
+        particle[count].position[0] = particlepossave[count][0];
+        particle[count].position[1] = particlepossave[count][1];
+        particle[count].position[2] = particlepossave[count][2];
+      }
+      for (count = 0; count < numofobjects; count++)
+      {
+        object[count].position[0] = objectpossave[count][0];
+        object[count].position[1] = objectpossave[count][1];
+        object[count].position[2] = objectpossave[count][2];
+      }
+      view.position[0] = viewposdraw[0];
+      view.position[1] = viewposdraw[1];
+    }
+
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
     if (!disable_frame)
@@ -916,69 +1095,6 @@ void gameloop(void)
       drawmousecursor(768 + font.cursornum, mouse.x, mouse.y, 16, 1.0f, 1.0f, 1.0f, 1.0f);
 
     PERF_SEC(10);
-#if defined(GISH_INSTRUMENT)
-    perf_t_sim0 = SDL_GetPerformanceCounter();
-#endif
-    simcount      = 0;
-    game.simspeed = 20;
-    if (game.turbomode)
-      game.simspeed = 15;
-
-    /* Optional frame limiter (config.txt: fpslimiter=1).  Waits until the next
-       simulation tick is due before rendering, so the frame rate matches the
-       sim rate (50 fps at the default 20 ms step) and every drawn frame is a
-       fresh state.  Skipped in turbo mode: there the sim asks for 66.7 fps,
-       which is already above the 60 Hz display, so a wait would only make the
-       sim fall behind and the accumulator start running double steps. */
-    if (config.fpslimiter && !game.turbomode)
-      while (SDL_GetTicks() - simtimer <= game.simspeed)
-        SDL_Delay(1);
-
-    while (SDL_GetTicks() - simtimer > game.simspeed && simcount < 3)
-    {
-      simcount++;
-      count    = SDL_GetTicks() - simtimer - game.simspeed;
-      simtimer = SDL_GetTicks() - count;
-      if (simcount == 3)
-        simtimer = SDL_GetTicks();
-
-      if (game.exitdelay > 0)
-        if (!game.editing)
-          game.exitdelay--;
-      if (keyboard[SCAN_ESC])
-        game.exitdelay = 0;
-
-      if (game.exit == GAMEEXIT_NONE && !game.pause && game.dialog == 0 && !game.over)
-      {
-        getinputs();
-
-        if (!game.playreplay)
-          saveinputs();
-        else
-          loadinputs();
-
-#if defined(GISH_INSTRUMENT)
-        perf_simtick = SDL_GetPerformanceCounter();
-#endif
-        if (game.startdelay == 0)
-          simulation();
-        gamelogic();
-        PERF_SIM(PERFSIM_LOGIC);
-      }
-    }
-#if defined(GISH_INSTRUMENT)
-    perf_t_sim1 = SDL_GetPerformanceCounter();
-    {
-      Uint64 dt = perf_t_sim1 - perf_t_sim0;
-      perf_render += perf_t_sim0 - perf_now;
-      perf_sim    += dt;
-      if (dt > perf_sim_max)
-        perf_sim_max = dt;
-      perf_steps  += simcount;
-      if (simcount >= 3)
-        perf_catchup++;
-    }
-#endif
 
     if (game.levelnum == 0 && game.editing)
       if (keyboard[SCAN_F1] && !prevkeyboard[SCAN_F1])
