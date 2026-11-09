@@ -757,19 +757,24 @@ void gameloop(void)
 
     setupviewpoint(view.position, view.orientation);
 
-    /* Retro pixelation (config.txt: warpzonepixelation=).  When it is on, the
-       level is drawn into a 256x256 (level 64) or 128x128 (level 65) corner of
-       the framebuffer, read back into a texture and drawn back magnified - see
-       the copy and the quad below.  When it is off, the viewport set by
-       setuporthoviewport() above is left alone, so the level renders
-       full-screen at native resolution and the expensive read-back in
-       glCopyTexImage2D never happens. */
+    /* Retro pixelation (config.txt: warpzonepixelation=, on by default).  When
+       it is on, the level is drawn into a 256x256 (level 64) or 128x128 (level
+       65) corner of the framebuffer, read back into a texture and drawn back
+       magnified - see the copy and the quad below.  When it is off, the
+       viewport set by setuporthoviewport() above is left alone, so the level
+       renders full-screen at native resolution and the expensive read-back in
+       glCopyTexImage2D never happens.
+
+       The low-resolution render area is placed at the bottom-left corner of the
+       render area, not of the framebuffer: the magnified quad below only covers
+       the render area, so anything drawn outside it (the 4:3 side bars in
+       keepaspect=1) would be left on screen as a stray patch. */
     if (config.warpzonepixelation)
     {
       if (game.oldschool == 1) // || game.oldschool==3)
-        glViewport(0, 0, 256, 256);
+        glViewport(renderareax, renderareay, 256, 256);
       if (game.oldschool == 2)
-        glViewport(0, 0, 128, 128);
+        glViewport(renderareax, renderareay, 128, 128);
     }
 
     soundsimulation(view.position, view.orientation);
@@ -810,22 +815,22 @@ void gameloop(void)
     PERF_SEC(9);
 
     /* Retro pixelation read-back, only with warpzonepixelation=1.  This single
-       glCopyTexImage2D costs about 54 ms per frame on the Vita (the driver
-       reads the framebuffer back in software), which is the whole difference
-       between 60 fps and 13 fps in these two levels.  With the option off the
-       level has already been rendered full-screen above, so there is nothing
-       to read back or magnify. */
+       glCopyTexImage2D dominates these two levels: the Vita driver reads the
+       framebuffer back in software, so the frame costs tens of milliseconds.
+       With the option off the level has already been rendered full-screen
+       above, so there is nothing to read back or magnify.  The source rectangle
+       is the same corner of the render area the viewport above used. */
     if (config.warpzonepixelation)
     {
       if (game.oldschool == 1) // || game.oldschool==3)
       {
         glBindTexture(GL_TEXTURE_2D, texture[334].glname);
-        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 0, 0, 256, 256, 0);
+        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, renderareax, renderareay, 256, 256, 0);
       }
       if (game.oldschool == 2)
       {
         glBindTexture(GL_TEXTURE_2D, texture[333].glname);
-        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 0, 0, 128, 128, 0);
+        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, renderareax, renderareay, 128, 128, 0);
       }
 
       if (game.oldschool == 1 || game.oldschool == 2) // || game.oldschool==3)
