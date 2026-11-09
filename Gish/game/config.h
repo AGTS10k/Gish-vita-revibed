@@ -49,6 +49,7 @@ typedef struct
   int warpzonepixelation;
   int fpslimiter;
   int frameinterpolation;
+  int msaa;
   int sound;
   int music;
   int joystick;

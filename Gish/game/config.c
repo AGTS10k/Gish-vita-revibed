@@ -157,6 +157,11 @@ void loadconfig(void)
      of drawing the stepped positions (default).  0 = draw the raw stepped
      state, the original behaviour. */
   config.frameinterpolation = 1;
+  /* Multisample anti-aliasing: 1 = ask the GLES driver for a 4x multisampled
+     framebuffer.  The Vita's tile-based GPU keeps the samples in tile memory
+     and resolves them on write-back, which is much cheaper than on an
+     immediate-mode desktop GPU.  0 = no MSAA (default). */
+  config.msaa = 0;
 #ifndef ANDROID_NDK
   config.joystick = 1;
 #ifdef __vita__
@@ -240,6 +245,7 @@ void loadconfig(void)
   optionreadint(&config.warpzonepixelation, "warpzonepixelation=");
   optionreadint(&config.fpslimiter, "fpslimiter=");
   optionreadint(&config.frameinterpolation, "frameinterpolation=");
+  optionreadint(&config.msaa, "msaa=");
 
   optionreadint(&option.sound, "soundon=");
   optionreadint(&option.music, "musicon=");
@@ -320,6 +326,7 @@ void saveconfig(void)
   optionwriteint(fp, &config.warpzonepixelation, "warpzonepixelation=");
   optionwriteint(fp, &config.fpslimiter, "fpslimiter=");
   optionwriteint(fp, &config.frameinterpolation, "frameinterpolation=");
+  optionwriteint(fp, &config.msaa, "msaa=");
 
   optionwriteint(fp, &option.sound, "soundon=");
   optionwriteint(fp, &option.music, "musicon=");

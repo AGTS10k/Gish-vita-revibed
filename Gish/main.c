@@ -148,6 +148,18 @@ int main(int argc, char *argv[])
      shadows are silently invisible.  8 bits = one per light. */
   SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, config.stencilbits);
 
+  /* 4x MSAA (config.txt: msaa=1).  SDL turns these two attributes into
+     EGL_SAMPLE_BUFFERS / EGL_SAMPLES when it picks the EGL config, and that
+     happens while the window (and its EGL surface) is created, so they must be
+     set before SDL_CreateWindow below.  The Vita's tile-based GPU keeps the
+     four samples in tile memory and resolves them on write-back, so the cost is
+     a fraction of what an immediate-mode desktop GPU pays. */
+  if (config.msaa)
+  {
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+  }
+
   globalwindow = SDL_CreateWindow("Gish GLES", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowinfo.resolutionx,
                                   windowinfo.resolutiony, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
   TO_DEBUG_LOG("CreateWindow -> %p err=[%s]\n", (void *)globalwindow, SDL_GetError());
