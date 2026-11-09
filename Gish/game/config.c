@@ -148,6 +148,10 @@ void loadconfig(void)
      into a texture and magnifies it - by far the most expensive frame in the
      game).  0 = render those levels full-screen at native resolution. */
   config.warpzonepixelation = 0;
+  /* Frame limiter: 1 = pace rendering to the simulation rate (50 fps with the
+     default 20 ms step) so every drawn frame is a fresh sim state.  0 = render
+     as fast as the display allows (default, the original behaviour). */
+  config.fpslimiter = 0;
 #ifndef ANDROID_NDK
   config.joystick = 1;
 #ifdef __vita__
@@ -229,6 +233,7 @@ void loadconfig(void)
   optionreadint(&config.lighting, "lighting=");
   optionreadint(&config.shadows, "shadows=");
   optionreadint(&config.warpzonepixelation, "warpzonepixelation=");
+  optionreadint(&config.fpslimiter, "fpslimiter=");
 
   optionreadint(&option.sound, "soundon=");
   optionreadint(&option.music, "musicon=");
@@ -307,6 +312,7 @@ void saveconfig(void)
   /* Must be written: saveconfig() rewrites config.txt from scratch on every
      boot, so an option that is only read would erase the user's setting. */
   optionwriteint(fp, &config.warpzonepixelation, "warpzonepixelation=");
+  optionwriteint(fp, &config.fpslimiter, "fpslimiter=");
 
   optionwriteint(fp, &option.sound, "soundon=");
   optionwriteint(fp, &option.music, "musicon=");

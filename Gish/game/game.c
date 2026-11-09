@@ -924,9 +924,15 @@ void gameloop(void)
     if (game.turbomode)
       game.simspeed = 15;
 
-    // Unlock Maximum FPS
-    //    while (SDL_GetTicks()-simtimer<=game.simspeed)
-    //      SDL_Delay(1);
+    /* Optional frame limiter (config.txt: fpslimiter=1).  Waits until the next
+       simulation tick is due before rendering, so the frame rate matches the
+       sim rate (50 fps at the default 20 ms step) and every drawn frame is a
+       fresh state.  Skipped in turbo mode: there the sim asks for 66.7 fps,
+       which is already above the 60 Hz display, so a wait would only make the
+       sim fall behind and the accumulator start running double steps. */
+    if (config.fpslimiter && !game.turbomode)
+      while (SDL_GetTicks() - simtimer <= game.simspeed)
+        SDL_Delay(1);
 
     while (SDL_GetTicks() - simtimer > game.simspeed && simcount < 3)
     {
