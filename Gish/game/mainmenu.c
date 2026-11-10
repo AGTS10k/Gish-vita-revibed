@@ -481,12 +481,12 @@ static const _backdroplayout backdroplayout[] = {
        joins are column 800 followed by column 1, which is how the brickwork
        wraps, so they land on matching content. */
     {"egypt.tga", 3, {671, 1, 1}, {800, 800, 130}},
-    /* 270..402 | 5..402 | 5..532 = 133 + 398 + 528 = 1059 design units.  Both
+    /* 269..402 | 5..402 | 5..532 = 134 + 398 + 528 = 1060 design units.  Both
        joins are column 402 followed by column 5.  The cave art is inset from
        the sides of the image, so columns 1..4 and 533..800 (the light border)
        are never sampled. */
     {"cave.tga", 3, {269, 5, 5}, {402, 402, 532}},
-    /* 273..401 | 1..800 | 400..529 = 129 + 800 + 130 = 1059 design units.  The
+    /* 272..401 | 1..800 | 400..529 = 130 + 800 + 130 = 1060 design units.  The
        joins are 401->1 and 800->400. */
     {"sewer.tga", 3, {272, 1, 400}, {401, 800, 529}},
 };
@@ -595,8 +595,9 @@ void displaylevelbackground(int texturenum, const char *filename)
   for (count = 0; count < layout->pieces; count++)
     total += layout->srcx1[count] - layout->srcx0[count] + 1;
 
-  /* Centre the composition on the screen: it is 1059-1060 units wide against
-     the 1059.3 the frustum covers, so the outer half-unit is clipped. */
+  /* Centre the composition on the screen: every layout is 1060 units wide
+     against the 1059.31 the frustum covers, so 0.345 units are clipped at each
+     outer edge. */
   shift = (float)(total - 800) * 0.5f;
 
   glMatrixMode(GL_MODELVIEW);
