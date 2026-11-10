@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 void mainmenu(void);
 void loadbackground(int texturenum, char *filename);
 void displaybackground(int texturenum);
+void displaylevelbackground(int texturenum, const char *filename);
 void versusmenu(void);
 void storyscreen(void);
 void introscreen(void);

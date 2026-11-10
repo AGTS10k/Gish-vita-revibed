@@ -51,6 +51,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../video/texture.h"
 
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 void mainmenu(void)
@@ -442,6 +443,178 @@ void displaybackground(int texturenum)
 
   if (hudfrustumscale > 1.0f)
     glDisable(GL_SCISSOR_TEST);
+}
+
+/* ---------------------------------------------------------------------------
+   EXPAND-MODE LEVEL BACKDROP (config.txt: keepaspect=2)
+
+   A level's backdrop (level.background) is an 800x600 image, loaded as twelve
+   256x256 tiles by loadbackground() and drawn by displaybackground() over the
+   whole 800x600 design space - which is exactly the screen in 4:3.  In expand
+   mode the HUD frustum is widened by hudfrustumscale (960/725 = 1.3241), so
+   the same 800x600 space is 1059.3 design units wide and the image alone would
+   leave 129.65 units of black down each side.  displaybackground() covers that
+   up by scissoring the backdrop to the central 4:3 strip, which is right for
+   menus but leaves the level itself with two black bars.
+
+   The three pattern backdrops are widened here the same way the 16:9 border is
+   built from border.tga: extra columns of the same image are drawn 1:1 beside
+   it, so the composition is wider than the screen and gets centred, and no
+   pixel is ever resampled.  Which columns to repeat was chosen by eye for each
+   image; the comment by each row says what the composition adds up to.
+
+   church2.tga is a photograph - a repeated band of sky and mountains would be
+   obvious - so it is zoomed by 1059.3/800 = 1.3241 instead and the top and
+   bottom are cropped away.  The crop starts at row 60 and is as tall as the
+   zoom leaves room for (453.1 rows), which keeps the aspect ratio exact.
+   --------------------------------------------------------------------------- */
+typedef struct
+{
+  const char *filename;
+  int pieces;          /* how many source ranges are laid out, left to right */
+  int srcx0[4];        /* first source column of each piece, 1-based */
+  int srcx1[4];        /* last source column of each piece, 1-based */
+} _backdroplayout;
+
+static const _backdroplayout backdroplayout[] = {
+    /* 671..800 | 1..800 | 1..130 = 130 + 800 + 130 = 1060 design units.  Both
+       joins are column 800 followed by column 1, which is how the brickwork
+       wraps, so they land on matching content. */
+    {"egypt.tga", 3, {671, 1, 1}, {800, 800, 130}},
+    /* 270..402 | 5..402 | 5..532 = 133 + 398 + 528 = 1059 design units.  Both
+       joins are column 402 followed by column 5.  The cave art is inset from
+       the sides of the image, so columns 1..4 and 533..800 (the light border)
+       are never sampled. */
+    {"cave.tga", 3, {269, 5, 5}, {402, 402, 532}},
+    /* 273..401 | 1..800 | 400..529 = 129 + 800 + 130 = 1059 design units.  The
+       joins are 401->1 and 800->400. */
+    {"sewer.tga", 3, {272, 1, 400}, {401, 800, 529}},
+};
+
+/* Draws the source rectangle (sx0,sy0)-(sx1,sy1) of an 800x600 backdrop onto
+   the design rectangle (dx0,dy0)-(dx1,dy1), splitting the quad at the 256x256
+   tile boundaries the image was loaded in (loadbackground()).  Source
+   coordinates are image pixels, origin top left, x1/y1 exclusive; the
+   destination is in 800x600 design units.  Both rectangles must be positive:
+   drawbackgroundsub() masks negative x with 0xFFFF, so callers shift the
+   modelview instead of passing negative coordinates. */
+static void drawbackdropmap(int texturenum, float sx0, float sy0, float sx1, float sy1, float dx0, float dy0,
+                            float dx1, float dy1)
+{
+  int tilex, tiley;
+  float rx0, rx1, ry0, ry1, ix0, ix1, iy0, iy1;
+  int px0, px1, py0, py1;
+
+  for (tiley = 0; tiley < 3; tiley++)
+  {
+    ry0 = (float)(tiley * 256);
+    ry1 = ry0 + 256.0f;
+    iy0 = (sy0 > ry0 ? sy0 : ry0);
+    iy1 = (sy1 < ry1 ? sy1 : ry1);
+
+    if (iy1 <= iy0)
+      continue;
+
+    py0 = (int)(dy0 + (iy0 - sy0) * (dy1 - dy0) / (sy1 - sy0) + 0.5f);
+    py1 = (int)(dy0 + (iy1 - sy0) * (dy1 - dy0) / (sy1 - sy0) + 0.5f);
+
+    if (py1 <= py0)
+      continue;
+
+    for (tilex = 0; tilex < 4; tilex++)
+    {
+      rx0 = (float)(tilex * 256);
+      rx1 = rx0 + 256.0f;
+      ix0 = (sx0 > rx0 ? sx0 : rx0);
+      ix1 = (sx1 < rx1 ? sx1 : rx1);
+
+      if (ix1 <= ix0)
+        continue;
+
+      /* Both edges of a tile are rounded the same way as the matching edge of
+         its neighbour, so the quads stay edge to edge instead of leaving a
+         one-pixel gap. */
+      px0 = (int)(dx0 + (ix0 - sx0) * (dx1 - dx0) / (sx1 - sx0) + 0.5f);
+      px1 = (int)(dx0 + (ix1 - sx0) * (dx1 - dx0) / (sx1 - sx0) + 0.5f);
+
+      if (px1 <= px0)
+        continue;
+
+      drawbackgroundsub(texturenum + tiley * 4 + tilex, px0, py0, px1 - px0, py1 - py0, (ix0 - rx0) / 256.0f,
+                        (iy0 - ry0) / 256.0f, (ix1 - rx0) / 256.0f, (iy1 - ry0) / 256.0f, 800, 600);
+    }
+  }
+}
+
+/* The backdrop for the level that is being played.  In 4:3 (and for any image
+   without an expand layout) this is displaybackground(), untouched. */
+void displaylevelbackground(int texturenum, const char *filename)
+{
+  const _backdroplayout *layout = NULL;
+  int count, total = 0, dstx = 0;
+  float extra, shift, width, srcheight;
+
+  if (hudfrustumscale <= 1.0f)
+  {
+    displaybackground(texturenum);
+
+    return;
+  }
+
+  /* Half the added width, in 800x600 design units.  1 NDC unit is 400 units
+     wide here (convertscreenvertex() divides by resolutionx/2), hence /400. */
+  extra = (hudfrustumscale - 1.0f) * 400.0f;
+
+  if (strcmp(filename, "church2.tga") == 0)
+  {
+    width     = 800.0f + extra * 2.0f;
+    srcheight = 600.0f * 800.0f / width; /* rows that fit the 1.324x zoom */
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glTranslatef(-extra / 400.0f, 0.0f, 0.0f);
+    drawbackdropmap(texturenum, 0.0f, 60.0f, 800.0f, 60.0f + srcheight, 0.0f, 0.0f, width, 600.0f);
+    glLoadIdentity();
+    glMatrixMode(GL_TEXTURE);
+
+    return;
+  }
+
+  for (count = 0; count < (int)(sizeof(backdroplayout) / sizeof(backdroplayout[0])); count++)
+    if (strcmp(filename, backdroplayout[count].filename) == 0)
+      layout = &backdroplayout[count];
+
+  if (layout == NULL)
+  {
+    /* No expand layout for this backdrop: leave it in the 4:3 strip. */
+    displaybackground(texturenum);
+
+    return;
+  }
+
+  for (count = 0; count < layout->pieces; count++)
+    total += layout->srcx1[count] - layout->srcx0[count] + 1;
+
+  /* Centre the composition on the screen: it is 1059-1060 units wide against
+     the 1059.3 the frustum covers, so the outer half-unit is clipped. */
+  shift = (float)(total - 800) * 0.5f;
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  glTranslatef(-shift / 400.0f, 0.0f, 0.0f);
+
+  dstx = 0;
+  for (count = 0; count < layout->pieces; count++)
+  {
+    width = (float)(layout->srcx1[count] - layout->srcx0[count] + 1);
+
+    drawbackdropmap(texturenum, (float)(layout->srcx0[count] - 1), 0.0f, (float)layout->srcx1[count], 600.0f,
+                    (float)dstx, 0.0f, (float)dstx + width, 600.0f);
+    dstx += (int)width;
+  }
+
+  glLoadIdentity();
+  glMatrixMode(GL_TEXTURE);
 }
 
 void versusmenu(void)

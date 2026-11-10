@@ -326,7 +326,7 @@ void gameloop(void)
     glColor3fv(level.ambient[3]);
 #endif
     if (level.background[0] != 0)
-      displaybackground(660);
+      displaylevelbackground(660, level.background);
     PERF_SEC(0);
 
     if (game.over != 0 && level.gametype < GAMETYPE_2FOOTBALL)
