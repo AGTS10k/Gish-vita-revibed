@@ -48,6 +48,10 @@ void creditsmenu(void)
 
   resetmenuitems();
 
+  /* Vita port: start the pad on the first link instead of inheriting whatever
+     index the main menu was sitting on. */
+  joymenunum = 1;
+
   while (!menuitem[0].active && !windowinfo.shutdown)
   {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -57,12 +61,17 @@ void creditsmenu(void)
     createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
     setmenuitem(MO_HOTKEY, SCAN_ESC);
 
+    /* Vita port: items are created in the order the pad walks them, so this
+       list is reading order down the screen: Mendo Mate (y=388), then the four
+       "Gish uses" links on the y=412 line.  The handlers at the end of the
+       loop use the same indices. */
+    createmenuitem("Mendo Mate", 64, 388, 12, 1.0f, 1.0f, 1.0f, 1.0f);
+
     count = sizeof(TXT_GISHUSES) * 12 + 66;
     createmenuitem("SDL", count, 412, 12, 1.0f, 1.0f, 1.0f, 1.0f);
     createmenuitem("OpenGL", count + 5 * 12, 412, 12, 1.0f, 1.0f, 1.0f, 1.0f);
     createmenuitem("OpenAL", count + 5 * 12 + 8 * 12, 412, 12, 1.0f, 1.0f, 1.0f, 1.0f);
     createmenuitem("Ogg Vorbis", count + 5 * 12 + 8 * 12 + 8 * 12, 412, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-    createmenuitem("Mendo Mate", 64, 388, 12, 1.0f, 1.0f, 1.0f, 1.0f);
 
     checksystemmessages();
     checkkeyboard();
@@ -190,27 +199,27 @@ void creditsmenu(void)
 
     if (menuitem[1].active)
     {
-      launchwebpage("www.libsdl.org");
+      launchwebpage("www.mendomate.com");
       menuitem[1].active = 0;
     }
     if (menuitem[2].active)
     {
-      launchwebpage("www.opengl.org");
+      launchwebpage("www.libsdl.org");
       menuitem[2].active = 0;
     }
     if (menuitem[3].active)
     {
-      launchwebpage("www.openal.org");
+      launchwebpage("www.opengl.org");
       menuitem[3].active = 0;
     }
     if (menuitem[4].active)
     {
-      launchwebpage("www.xiph.org");
+      launchwebpage("www.openal.org");
       menuitem[4].active = 0;
     }
     if (menuitem[5].active)
     {
-      launchwebpage("www.mendomate.com");
+      launchwebpage("www.xiph.org");
       menuitem[5].active = 0;
     }
   }

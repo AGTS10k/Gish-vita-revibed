@@ -38,6 +38,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define MO_RESIZE 12
 #define MO_CURSOR 13
 #define MO_BACKGROUND 14
+#define MO_HOTKEYLETTER 15
 
 void checkmenuitems(void);
 void drawmenuitems(void);
@@ -66,6 +67,11 @@ typedef struct
   int sizex;
   int sizey;
   int hotkey;
+  /* Letter of the label that drawmenuitems() draws at full brightness.  0 means
+     "work it out from keyboardlabel[hotkey]" (see MO_HOTKEYLETTER).  Needed
+     because the port's keyboardlabel[] holds pad-button glyphs for A/S/D/Space
+     (0x84-0x87, isage's additions to font00) and nothing at all for Esc. */
+  int hotkeyletter;
   int repeat;
   int highlight;
   int prevhighlight;

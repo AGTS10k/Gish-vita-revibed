@@ -54,9 +54,25 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string.h>
 #include <time.h>
 
+/* Texture number of crypticsea.tga, -1 when it failed to load.  It is file
+   scope because both the menu setup and introscreen()'s fade need it. */
+static int crypticseatex = -1;
+
+/* Main-menu item indices.  checkmenuitems() walks the items in creation order,
+   so these indices are also the pad order: Start -> Versus -> Options ->
+   Credits -> Exit -> Cryptic Sea, then back to Start.  The Cryptic Sea entry is
+   item 0 and Exit is last, which is only possible because the loop below tests
+   the exit item's own index instead of the usual menuitem[0]. */
+#define MENU_CRYPTICSEA 0
+#define MENU_START 1
+#define MENU_VERSUS 2
+#define MENU_OPTIONS 3
+#define MENU_CREDITS 4
+#define MENU_EXIT 5
+
 void mainmenu(void)
 {
-  int count, temp;
+  int count, temp, exitx;
   int prevjoymenunum;
   // int registered;
   char loadfilename[32] = "loading00.tga";
@@ -127,7 +143,10 @@ void mainmenu(void)
   loadtexturetga(526, "warpimg.tga", 0, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
   loadtexturetga(527, "satantalk.tga", 0, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 
-  int crypticseatex
+  /* Vita port: the Cryptic Sea logo is a menu item again, so the texture is
+     loaded here (1 MB of VRAM).  The result is kept in crypticseatex: if the
+     load fails the item is created without MO_IMAGE and simply never shows. */
+  crypticseatex
       = loadtexturetga(528, "crypticsea.tga", 0, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
   loadtexturetga(529, "turbo.tga", 0, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
   loadtexturetga(530, "sumo.tga", 0, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
@@ -277,10 +296,10 @@ void mainmenu(void)
 
   resetmenuitems();
 
-  joymenunum     = 1;
+  joymenunum     = MENU_START;
   game.turbomode = config.turbomode;
 
-  while (!menuitem[0].active && !windowinfo.shutdown)
+  while (!menuitem[MENU_EXIT].active && !windowinfo.shutdown)
   {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -288,25 +307,52 @@ void mainmenu(void)
     numofmenuitems = 0;
     temp = (sizeof(TXT_EXIT) + sizeof(TXT_CREDITS) + sizeof(TXT_OPTIONS) + sizeof(TXT_VERSUS) + sizeof(TXT_START) - 1)
            * 8;
+    /* Exit is created last, so that the pad reaches it after Credits, but its x
+       is still measured against the full row width - which is what temp holds
+       before the -= lines below shrink it. */
+    exitx = (320 + temp) | TEXT_END;
 
-    createmenuitem(TXT_EXIT, (320 + temp) | TEXT_END, 380, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    setmenuitem(MO_HOTKEY, SCAN_ESC);
+    /* Item 0: the Cryptic Sea credit.  It is a text item created at 0,0 that
+       MO_IMAGE turns into a picture item, and MO_RESIZE then moves it to the
+       top left corner and gives it its 96x48 size - the original 0,0/1
+       arguments only exist so createmenuitem() has something to store.  Its
+       visible focus feedback is the copyright line at the bottom of the screen
+       (see the MENU_CRYPTICSEA test below) and confirming it opens
+       www.crypticsea.com.  If the texture failed to load the item stays
+       invisible; the menu is unusable on a pad without it, so it is always
+       created. */
+    createmenuitem("Cryptic Sea", 0, 0, 1, 1.0f, 1.0f, 1.0f, 1.0f);
+    if (!(crypticseatex == -1))
+    {
+      setmenuitem(MO_IMAGE, 528);
+      setmenuitem(MO_RESIZE, 16, 0, 96, 48);
+    }
+
+    /* Items 1-4: the visible row, left to right (creation order is pad order).
+       Versus and Options were disabled by the previous porter, but the width
+       maths always reserved room for all five labels, so re-enabling them
+       restores the original 5 item row without shifting anything. */
     createmenuitem(TXT_START, 320 - temp, 380, 16, 1.0f, 1.0f, 1.0f, 1.0f);
     setmenuitem(MO_HOTKEY, SCAN_S);
+    /* keyboardlabel[SCAN_S] holds the Triangle glyph (0x85), which isage put
+       there instead of the original "S" (his pad-button hints), so the automatic
+       hotkey highlight cannot find the S - name it here. */
+    setmenuitem(MO_HOTKEYLETTER, 'S');
     temp -= (sizeof(TXT_START)) * 16;
-    //    createmenuitem(TXT_VERSUS,320-temp,380,16,1.0f,1.0f,1.0f,1.0f);
-    //    setmenuitem(MO_HOTKEY,SCAN_V);
+    createmenuitem(TXT_VERSUS, 320 - temp, 380, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    setmenuitem(MO_HOTKEY, SCAN_V);
     temp -= (sizeof(TXT_VERSUS)) * 16;
-    //    createmenuitem(TXT_OPTIONS,320-temp,380,16,1.0f,1.0f,1.0f,1.0f);
-    //    setmenuitem(MO_HOTKEY,SCAN_O);
+    createmenuitem(TXT_OPTIONS, 320 - temp, 380, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    setmenuitem(MO_HOTKEY, SCAN_O);
     temp -= (sizeof(TXT_OPTIONS)) * 16;
     createmenuitem(TXT_CREDITS, 320 - temp, 380, 16, 1.0f, 1.0f, 1.0f, 1.0f);
     setmenuitem(MO_HOTKEY, SCAN_C);
-    //    createmenuitem("Cryptic Sea",0,0,1,1.0f,1.0f,1.0f,1.0f);
-    //    if (!(crypticseatex == -1)) {
-    //        setmenuitem(MO_IMAGE,528);
-    //        setmenuitem(MO_RESIZE,16,0,96,48);
-    //    }
+
+    /* Item 5: Exit.  Its hotkey is Esc, which keyboardlabel[] spells out, so
+       the E needs naming too. */
+    createmenuitem(TXT_EXIT, exitx, 380, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    setmenuitem(MO_HOTKEY, SCAN_ESC);
+    setmenuitem(MO_HOTKEYLETTER, 'E');
 
     checksystemmessages();
     checkkeyboard();
@@ -331,7 +377,9 @@ void mainmenu(void)
       drawtext(TXT_TURBO_EDITION, (640 | TEXT_END), 470, 10, 1.0f, 1.0f, 1.0f, 1.0f);
     drawtext("Version 1.53V", 0, 470, 10, 1.0f, 1.0f, 1.0f, 1.0f);
 
-    if (joymenunum == 5)
+    /* The Cryptic Sea item has no focus art of its own, so while the pad sits on
+       it the copyright line is brightened instead. */
+    if (joymenunum == MENU_CRYPTICSEA)
     {
       drawtext(TXT_COPYRIGHT, (320 | TEXT_CENTER), 470, 10, 1.0f, 1.0f, 1.0f, 1.0f);
     }
@@ -350,45 +398,44 @@ void mainmenu(void)
     SDL_GL_SwapWindow(globalwindow);
 #endif
 
-    if (menuitem[5].active)
+    if (menuitem[MENU_CRYPTICSEA].active)
     {
       launchwebpage("www.crypticsea.com");
-      menuitem[5].active = 0;
+      menuitem[MENU_CRYPTICSEA].active = 0;
     }
-    if (menuitem[4].active)
+    if (menuitem[MENU_CREDITS].active)
     {
       // game.songnum=-1;
       // checkmusic();
 
-      prevjoymenunum = 4;
+      prevjoymenunum = MENU_CREDITS;
       creditsmenu();
       joymenunum = prevjoymenunum;
     }
-    if (menuitem[3].active)
+    if (menuitem[MENU_OPTIONS].active)
     {
       game.songnum = -1;
       checkmusic();
 
-      prevjoymenunum = 3;
+      prevjoymenunum = MENU_OPTIONS;
       optionsmenu();
       joymenunum = prevjoymenunum;
     }
-    if (menuitem[2].active)
+    if (menuitem[MENU_VERSUS].active)
     {
       // game.songnum=-1;
       // checkmusic();
 
-      prevjoymenunum = 2;
-      //      versusmenu();
-      creditsmenu();
+      prevjoymenunum = MENU_VERSUS;
+      versusmenu();
       joymenunum = prevjoymenunum;
     }
-    if (menuitem[1].active)
+    if (menuitem[MENU_START].active)
     {
       // game.songnum=-1;
       // checkmusic();
 
-      prevjoymenunum = 1;
+      prevjoymenunum = MENU_START;
       playermenu();
       joymenunum = prevjoymenunum;
     }
@@ -960,10 +1007,27 @@ void introscreen(void)
       glColor4f(1.0f, 1.0f, 1.0f, alpha);
       displaybackground(470);
 
+      /* Vita port: the Cryptic Sea logo is drawn here as well, at the same
+         place and size the menu item uses (MO_RESIZE 16,0,96,48), so it fades
+         in with the rest of the row.  drawmenuitems() forces alpha 1.0, which
+         is why the logo cannot simply be left to it during the fade. */
+      if (!(crypticseatex == -1))
+      {
+        glColor4f(1.0f, 1.0f, 1.0f, alpha);
+        drawbackground(528, 16, 0, 96, 48, font.sizex, font.sizey);
+      }
+
       drawtext(TXT_EXIT, (320 + 72 + 128), 380, 16, 0.5f, 0.5f, 0.5f, alpha);
       drawtext(TXT_START, (320 - 72 - 112) | TEXT_END, 380, 16, 0.5f, 0.5f, 0.5f, alpha);
-      //      drawtext(TXT_VERSUS,(320-72)|TEXT_END,380,16,0.5f,0.5f,0.5f,alpha);
-      //      drawtext(TXT_OPTIONS,(320)|TEXT_CENTER,380,16,0.5f,0.5f,0.5f,alpha);
+      /* Vita port: the fade had its own hand written copy of the menu row
+         (drawmenuitems() hardcodes alpha 1.0, so it cannot be faded).  Versus
+         and Options were missing from it, which is why they used to pop in at
+         full brightness the moment the intro ended.  Both coordinates below are
+         the same place the real items are created: 320-72|TEXT_END is the right
+         edge of the Versus label at x=152, 320|TEXT_CENTER is the centre of the
+         Options label at x=264. */
+      drawtext(TXT_VERSUS, (320 - 72) | TEXT_END, 380, 16, 0.5f, 0.5f, 0.5f, alpha);
+      drawtext(TXT_OPTIONS, (320 | TEXT_CENTER), 380, 16, 0.5f, 0.5f, 0.5f, alpha);
       drawtext(TXT_CREDITS, (320 + 72), 380, 16, 0.5f, 0.5f, 0.5f, alpha);
 
       if (game.turbomode)

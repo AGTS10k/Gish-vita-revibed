@@ -34,6 +34,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <SDL.h>
 #endif
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #endif
 
@@ -94,5 +95,13 @@ void launchwebpage(char *webpagename)
   SDL_MinimizeWindow(globalwindow);
   openUrlFromJNI((const char *)command);
 #endif // !ANDROID_NDK
+#endif
+#ifdef __vita__
+  /* Vita port: hand the URL to the system Web Browser. SDL's Vita backend
+     (src/misc/vita/SDL_sysurl.c) calls sceAppUtilLaunchWebBrowser, which
+     suspends the game; the PS button brings it back. */
+  char url[256];
+  snprintf(url, sizeof(url), "http://%s", webpagename);
+  SDL_OpenURL(url);
 #endif
 }

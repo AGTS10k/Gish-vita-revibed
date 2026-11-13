@@ -136,10 +136,14 @@ void optionsmenu(void)
       createmenuitem("        ", 480, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       count += 16;
 
-      //    createmenuitem(TXT_VIDEOOPTIONS,320,0,16,1.0f,1.0f,1.0f,1.0f);
-      //    setmenuitem(MO_HOTKEY,SCAN_V);
-      //    createmenuitem(TXT_4_PLAYER,160,0,16,1.0f,1.0f,1.0f,1.0f);
-      //    setmenuitem(MO_HOTKEY,SCAN_4);
+      /* Vita port: the previous porter left these two items commented out but
+         left the width maths around them active.  They land at indices 34 and
+         35, which the handlers at the bottom of this loop already expect
+         (videooptionsmenu() / optionsmenu2()). */
+      createmenuitem(TXT_VIDEOOPTIONS, 320, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_HOTKEY, SCAN_V);
+      createmenuitem(TXT_4_PLAYER, 160, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_HOTKEY, SCAN_4);
 
       count = 112;
       if (control[0].joysticknum == -1)

@@ -180,11 +180,26 @@ void drawmenuitems(void)
 {
   int count, count2;
   int xoffset, yoffset;
-  char labelascii;
+  char labelascii, hotletter;
   float vec[3];
 
   for (count = 0; count < numofmenuitems; count++)
   {
+    /* The letter of an item's label that is drawn at full brightness is the
+       letter of the key that activates the item.  Normally that comes from
+       keyboardlabel[], but that table only holds a usable letter when the key
+       is a plain letter ("V"): it spells out other keys ("Esc", "Enter") and
+       the port replaced A, S, D and Space with pad-button glyphs 0x84-0x87
+       (Square/Triangle/Circle/Cross), which isage added to font00 - the
+       original 1.53 font only had the four arrows at 0x80-0x83.  Items whose
+       key is one of those can name their letter explicitly with
+       MO_HOTKEYLETTER. */
+    hotletter = 0;
+    if (menuitem[count].hotkeyletter != 0)
+      hotletter = (char)toupper(menuitem[count].hotkeyletter);
+    else if (keyboardlabel[menuitem[count].hotkey][0] != 0 && keyboardlabel[menuitem[count].hotkey][1] == 0)
+      hotletter = keyboardlabel[menuitem[count].hotkey][0];
+
     if (menuitem[count].texturenum == -1)
     {
       if (menuitem[count].highlight < 2)
@@ -201,20 +216,26 @@ void drawmenuitems(void)
       labelascii = 0;
       if (menuitem[count].highlight != 0)
       {
-        while (count2 < menuitem[count].sizex && menuitem[count].label[count2] != 0
-               && keyboardlabel[menuitem[count].hotkey][0] != labelascii)
+        /* Letters up to and including the key's letter are drawn here so that
+           that one can be bright; the rest of the label is drawn dim by the
+           loop below.  With no letter to find (hotletter == 0) this loop draws
+           nothing and the label comes out entirely dim. */
+        while (count2 < menuitem[count].sizex && menuitem[count].label[count2] != 0)
         {
           labelascii = toupper(menuitem[count].label[count2]);
-          if (keyboardlabel[menuitem[count].hotkey][0] == labelascii && keyboardlabel[menuitem[count].hotkey][1] == 0)
+          if (hotletter == labelascii)
+          {
             drawtext("/c", menuitem[count].x + count2 * menuitem[count].textsize, menuitem[count].y,
                      menuitem[count].textsize, menuitem[count].r, menuitem[count].g, menuitem[count].b, 1.0f,
                      menuitem[count].label[count2]);
-          else
-            drawtext("/c", menuitem[count].x + count2 * menuitem[count].textsize, menuitem[count].y,
-                     menuitem[count].textsize, (float)(menuitem[count].r * (menuitem[count].highlight + 1)) / 4,
-                     (float)(menuitem[count].g * (menuitem[count].highlight + 1)) / 4,
-                     (float)(menuitem[count].b * (menuitem[count].highlight + 1)) / 4, 1.0f,
-                     menuitem[count].label[count2]);
+            count2++;
+            break;
+          }
+          drawtext("/c", menuitem[count].x + count2 * menuitem[count].textsize, menuitem[count].y,
+                   menuitem[count].textsize, (float)(menuitem[count].r * (menuitem[count].highlight + 1)) / 4,
+                   (float)(menuitem[count].g * (menuitem[count].highlight + 1)) / 4,
+                   (float)(menuitem[count].b * (menuitem[count].highlight + 1)) / 4, 1.0f,
+                   menuitem[count].label[count2]);
 
           count2++;
         }
@@ -398,6 +419,7 @@ void createmenuitem(char *label, int x, int y, int textsize, float r, float g, f
   menuitem[numofmenuitems].sizex        = strlen(label);
   menuitem[numofmenuitems].sizey        = 1;
   menuitem[numofmenuitems].hotkey       = 0;
+  menuitem[numofmenuitems].hotkeyletter = 0;
   menuitem[numofmenuitems].repeat       = 0;
   menuitem[numofmenuitems].highlight    = 1;
   menuitem[numofmenuitems].value        = 0;
@@ -421,6 +443,8 @@ void setmenuitem(int option, ...)
 
   if (option == MO_HOTKEY)
     menuitem[numofmenuitems - 1].hotkey = va_arg(ap, int);
+  if (option == MO_HOTKEYLETTER)
+    menuitem[numofmenuitems - 1].hotkeyletter = va_arg(ap, int);
   if (option == MO_HIGHLIGHT)
     menuitem[numofmenuitems - 1].highlight = va_arg(ap, int);
   if (option == MO_INTINPUT)
@@ -513,6 +537,7 @@ void createmenuitemempty(void)
   menuitem[numofmenuitems].sizex        = 0;
   menuitem[numofmenuitems].sizey        = 0;
   menuitem[numofmenuitems].hotkey       = 0;
+  menuitem[numofmenuitems].hotkeyletter = 0;
   menuitem[numofmenuitems].highlight    = 0;
   menuitem[numofmenuitems].value        = 0;
   menuitem[numofmenuitems].inputtype    = 0;

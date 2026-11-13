@@ -114,6 +114,7 @@ target_link_libraries(${TARGET_NAME}
     SceAudio_stub
     SceAudioIn_stub
     SceIme_stub
+    SceAppUtil_stub
     liblibGLESv1_CM_stub_weak.a liblibgpu_es4_ext_stub_weak.a liblibIMGEGL_stub_weak.a
 )
 
