@@ -97,4 +97,6 @@ extern int currentmenuitem;
 
 extern char keyboardlabel[323][16];
 
+char *joylabel(int button);
+
 #endif /* GISH_MENU_MENU_H */

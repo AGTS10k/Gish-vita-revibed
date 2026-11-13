@@ -46,5 +46,6 @@ typedef struct
 extern char textstring2[1024];
 extern char textstring3[1024];
 extern _font font;
+extern int textpixelsnap;
 
 #endif /* GISH_VIDEO_TEXT_H */

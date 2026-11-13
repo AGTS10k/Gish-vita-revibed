@@ -27,12 +27,24 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../video/opengl.h"
 #include "../video/texture.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 char textstring2[1024];
 char textstring3[1024];
 _font font;
+
+/* Vita port: when this is set, drawtext lays every glyph out at exactly 16x16
+   physical pixels, snaps each quad to a whole pixel boundary and samples the
+   16 texels of the atlas cell from 0.5 to 16.5.  One atlas texel then maps to
+   exactly one screen pixel and the font is not resampled at all.
+   The HUD otherwise lives in the 640x480 design space, which expand mode scales
+   by 725/640, so a 16 unit glyph comes out 18.13 px and every stroke lands on a
+   fractional pixel.  Enabled by the level 1 tutorial and key legend only -
+   menus, dialogs and the score digits keep the design space layout they were
+   authored in (their drawbackground tiles live in that same space). */
+int textpixelsnap = 0;
 
 /* Screen-space drawing - the frame, HUD icons, menus and text - is not part of
    the level, so it keeps whatever filtering its textures were loaded with,
@@ -55,6 +67,7 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
   va_list ap;
   float vec[3];
   float texcoord[2];
+  float advx, szx, szy, bx, by, texspan, texoff;
 
   count  = 0;
   count2 = 0;
@@ -151,16 +164,60 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
 
   textstring2[count2] = 0;
 
-  if ((x & TEXT_CENTER) == TEXT_CENTER)
-    x = x - (count2 * textsize) / 2;
-  if ((y & TEXT_CENTER) == TEXT_CENTER)
-    y = y - (textsize) / 2;
-  if ((x & TEXT_END) == TEXT_END)
-    x = x - (count2 * textsize);
-  if ((y & TEXT_END) == TEXT_END)
-    y = y - textsize;
-  x &= 0xFFFF;
-  y &= 0xFFFF;
+  if (textpixelsnap)
+  {
+    /* 1:1 path: 16x16 physical pixels per glyph, origin snapped to the pixel
+       grid.  advx/szx/szy stay in design units so the maths below is unchanged. */
+    float pxscale_x = (float)hudareaw / ((float)font.sizex * hudfrustumscale);
+    float pxscale_y = (float)hudareah / (0.75f * (float)font.sizex);
+
+    advx    = 16.0f / pxscale_x;
+    szx     = advx;
+    szy     = 16.0f / pxscale_y;
+    texspan = 16.0f;
+    texoff  = 0.0f;
+
+    /* x and y still carry the TEXT_CENTER/TEXT_END flag bits here - the
+       original path below strips them with x &= 0xFFFF, so mask them off
+       before they become coordinates. */
+    bx = (float)(x & 0xFFFF);
+    by = (float)(y & 0xFFFF);
+    if ((x & TEXT_CENTER) == TEXT_CENTER)
+      bx -= (float)count2 * advx * 0.5f;
+    if ((y & TEXT_CENTER) == TEXT_CENTER)
+      by -= szy * 0.5f;
+    if ((x & TEXT_END) == TEXT_END)
+      bx -= (float)count2 * advx;
+    if ((y & TEXT_END) == TEXT_END)
+      by -= szy;
+
+    bx = (floorf((bx - 0.5f * (float)font.sizex) * pxscale_x + 0.5f * (float)hudareaw + 0.5f) -
+          0.5f * (float)hudareaw) /
+             pxscale_x +
+         0.5f * (float)font.sizex;
+    by = floorf(by * pxscale_y + 0.5f) / pxscale_y;
+  }
+  else
+  {
+    if ((x & TEXT_CENTER) == TEXT_CENTER)
+      x = x - (count2 * textsize) / 2;
+    if ((y & TEXT_CENTER) == TEXT_CENTER)
+      y = y - (textsize) / 2;
+    if ((x & TEXT_END) == TEXT_END)
+      x = x - (count2 * textsize);
+    if ((y & TEXT_END) == TEXT_END)
+      y = y - textsize;
+    x &= 0xFFFF;
+    y &= 0xFFFF;
+
+    advx    = (float)textsize;
+    szx     = (float)textsize;
+    szy     = (float)textsize;
+    texspan = 16.0f - 0.5f;
+    texoff  = 0.5f;
+    bx      = (float)x;
+    by      = (float)y;
+  }
 
   glBindTexture(GL_TEXTURE_2D, texture[1000 + font.texturenum].glname);
   useuitexture(1000 + font.texturenum);
@@ -181,11 +238,11 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
 #endif
       glColor4f(red, green, blue, alpha);
 
-      vec[0] = (float)x + (float)count * (float)textsize;
-      vec[1] = (float)y;
+      vec[0] = bx + (float)count * advx;
+      vec[1] = by;
       convertscreenvertex(vec, font.sizex, font.sizey);
-      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + 0.5f;
-      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + 0.5f;
+      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + texoff;
+      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + texoff;
       texcoord[0] /= 256.0f;
       texcoord[1] /= 256.0f;
 #if defined(GLES)
@@ -198,11 +255,11 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
       glTexCoord2fv(texcoord);
       glVertex3fv(vec);
 #endif
-      vec[0] = (float)x + (float)textsize + (float)(count) * (float)textsize;
-      vec[1] = (float)y;
+      vec[0] = bx + szx + (float)count * advx;
+      vec[1] = by;
       convertscreenvertex(vec, font.sizex, font.sizey);
-      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + 16.0f - 0.5f;
-      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + 0.5f;
+      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + texspan;
+      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + texoff;
       texcoord[0] /= 256.0f;
       texcoord[1] /= 256.0f;
 
@@ -216,11 +273,11 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
       glTexCoord2fv(texcoord);
       glVertex3fv(vec);
 #endif
-      vec[0] = (float)x + (float)textsize + (float)(count) * (float)textsize;
-      vec[1] = (float)y + (float)textsize;
+      vec[0] = bx + szx + (float)count * advx;
+      vec[1] = by + szy;
       convertscreenvertex(vec, font.sizex, font.sizey);
-      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + 16.0f - 0.5f;
-      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + 16.0f - 0.5f;
+      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + texspan;
+      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + texspan;
       texcoord[0] /= 256.0f;
       texcoord[1] /= 256.0f;
 
@@ -234,11 +291,11 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
       glTexCoord2fv(texcoord);
       glVertex3fv(vec);
 #endif
-      vec[0] = (float)x + (float)(count) * (float)textsize;
-      vec[1] = (float)y + (float)textsize;
+      vec[0] = bx + (float)count * advx;
+      vec[1] = by + szy;
       convertscreenvertex(vec, font.sizex, font.sizey);
-      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + 0.5f;
-      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + 16.0f - 0.5f;
+      texcoord[0] = (float)(textstring2[count] & 15) * 16.0f + texoff;
+      texcoord[1] = (float)((unsigned char)textstring2[count] >> 4) * 16.0f + texspan;
       texcoord[0] /= 256.0f;
       texcoord[1] /= 256.0f;
 #if defined(GLES)
@@ -276,8 +333,8 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
 #endif
       glColor4f(red, green, blue, alpha);
 
-      vec[0] = (float)x + (float)count * (float)textsize;
-      vec[1] = (float)y;
+      vec[0] = bx + (float)count * advx;
+      vec[1] = by;
       convertscreenvertex(vec, font.sizex, font.sizey);
 #if defined(GLES)
       quad[0] = vec[0];
@@ -287,8 +344,8 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
       glVertex3fv(vec);
 #endif
 
-      vec[0] = (float)x + (float)textsize + (float)(count) * (float)textsize;
-      vec[1] = (float)y;
+      vec[0] = bx + szx + (float)count * advx;
+      vec[1] = by;
       convertscreenvertex(vec, font.sizex, font.sizey);
 #if defined(GLES)
       quad[3] = vec[0];
@@ -297,8 +354,8 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
 #else
       glVertex3fv(vec);
 #endif
-      vec[0] = (float)x + (float)textsize + (float)(count) * (float)textsize;
-      vec[1] = (float)y + (float)textsize;
+      vec[0] = bx + szx + (float)count * advx;
+      vec[1] = by + szy;
       convertscreenvertex(vec, font.sizex, font.sizey);
 #if defined(GLES)
       quad[6] = vec[0];
@@ -307,8 +364,8 @@ void drawtext(char *textstring, int x, int y, int textsize, float red, float gre
 #else
       glVertex3fv(vec);
 #endif
-      vec[0] = (float)x + (float)(count) * (float)textsize;
-      vec[1] = (float)y + (float)textsize;
+      vec[0] = bx + (float)count * advx;
+      vec[1] = by + szy;
       convertscreenvertex(vec, font.sizex, font.sizey);
 #if defined(GLES)
       quad[9]  = vec[0];

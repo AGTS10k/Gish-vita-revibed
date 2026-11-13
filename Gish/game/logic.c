@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../game/options.h"
 #include "../game/player.h"
 #include "../game/setup.h"
+#include "../input/joystick.h"
 #include "../input/keyboard.h"
 #include "../menu/menu.h"
 #include "../physics/particle.h"
@@ -42,11 +43,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string.h>
 
 // EXL: Some Tutorial Coords
-int YtxtMove          = 382;
+/* Vita port: the tutorial is drawn at textsize 16 so every glyph maps 1:1 onto
+   the 16x16 atlas cells (no 0.75x minification).  The row spacing is therefore
+   16 as well, and the legend rows sit 16 apart. */
+int YtxtMove          = 368;
 int YtxtButtonRow3    = 424;
-int YtxtButtonRow2    = 412;
-int YtxtButtonRow1    = 400;
-int YtxtActionButtons = 406;
+int YtxtButtonRow2    = 408;
+int YtxtButtonRow1    = 392;
+int YtxtActionButtons = 400;
 
 void gamelogic(void)
 {
@@ -1349,6 +1353,11 @@ void gamedisplay(void)
         drawbackground(821, 640 - 512, 480 - 256, 512, 256, 640, 480);
     }
   }
+  /* Vita port: the level 1 tutorial hints and the key legend are drawn 1:1
+     (16x16 physical pixels per glyph, one atlas texel per screen pixel) instead
+     of being scaled with the 640x480 HUD.  See textpixelsnap in video/text.c. */
+  if (game.levelnum == 1 || game.playreplay)
+    textpixelsnap = 1;
   if (game.levelnum == 1)
   {
     keyhighlight  = -1;
@@ -1357,55 +1366,55 @@ void gamedisplay(void)
       if (object[0].position[1] >= level.area[1][1] && object[0].position[1] < level.area[1][3])
       {
         count = 68;
-        drawtext(TXT_TUTORIAL_LINE1, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_SLIDE]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE2, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
+        drawtext(TXT_TUTORIAL_LINE1, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_SLIDE]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE2, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
 
-        keyhighlight = control[0].key[KEYALIAS_SLIDE];
+        keyhighlight = control[0].button[KEYALIAS_SLIDE];
       }
     if (object[0].position[0] >= level.area[2][0] && object[0].position[0] < level.area[2][2])
       if (object[0].position[1] >= level.area[2][1] && object[0].position[1] < level.area[2][3])
       {
         count = 68;
-        drawtext(TXT_TUTORIAL_LINE3, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_SLIDE]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE4, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
+        drawtext(TXT_TUTORIAL_LINE3, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_SLIDE]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE4, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
       }
     if (object[0].position[0] >= level.area[3][0] && object[0].position[0] < level.area[3][2])
       if (object[0].position[1] >= level.area[3][1] && object[0].position[1] < level.area[3][3])
       {
         count = 68;
-        drawtext(TXT_TUTORIAL_LINE5, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_STICK]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE6, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_UP]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE7, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
+        drawtext(TXT_TUTORIAL_LINE5, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_STICK]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE6, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_UP]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE7, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
 
-        keyhighlight  = control[0].key[KEYALIAS_STICK];
-        keyhighlight2 = control[0].key[KEYALIAS_UP];
+        keyhighlight  = control[0].button[KEYALIAS_STICK];
+        keyhighlight2 = control[0].button[KEYALIAS_UP];
       }
     if (object[0].position[0] >= level.area[4][0] && object[0].position[0] < level.area[4][2])
       if (object[0].position[1] >= level.area[4][1] && object[0].position[1] < level.area[4][3])
       {
         count = 68;
-        drawtext(TXT_TUTORIAL_LINE8, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_JUMP]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE9, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE10, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE11, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE12, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
+        drawtext(TXT_TUTORIAL_LINE8, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_JUMP]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE9, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE10, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE11, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE12, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
 
         miny = object[0].position[1];
         maxy = object[0].position[1];
@@ -1418,77 +1427,81 @@ void gamedisplay(void)
         }
 
         if (maxy - miny < 1.6f && maxy - level.area[4][1] < 2.0f)
-          keyhighlight = control[0].key[KEYALIAS_JUMP];
+          keyhighlight = control[0].button[KEYALIAS_JUMP];
         if (object[0].velocity[1] > 0.02f)
-          keyhighlight2 = control[0].key[KEYALIAS_UP];
+          keyhighlight2 = control[0].button[KEYALIAS_UP];
         if (object[0].velocity[1] < -0.02f)
-          keyhighlight2 = control[0].key[KEYALIAS_DOWN];
+          keyhighlight2 = control[0].button[KEYALIAS_DOWN];
       }
     if (object[0].position[0] >= level.area[5][0] && object[0].position[0] < level.area[5][2])
       if (object[0].position[1] >= level.area[5][1] && object[0].position[1] < level.area[5][3])
       {
         count = 68;
-        drawtext(TXT_TUTORIAL_LINE13, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_HEAVY]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE14, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
+        drawtext(TXT_TUTORIAL_LINE13, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_HEAVY]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE14, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
 
-        keyhighlight = control[0].key[KEYALIAS_HEAVY];
+        keyhighlight = control[0].button[KEYALIAS_HEAVY];
       }
     if (object[0].position[0] >= level.area[6][0] && object[0].position[0] < level.area[6][2])
       if (object[0].position[1] >= level.area[6][1] && object[0].position[1] < level.area[6][3])
       {
         count = 68;
-        drawtext(TXT_TUTORIAL_LINE15, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_STICK]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE16, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_UP]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE17, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f,
-                 keyboardlabel[control[0].key[KEYALIAS_LEFT]]);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE18, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
-        drawtext(TXT_TUTORIAL_LINE19, (320 | TEXT_CENTER), count, 12, 1.0f, 1.0f, 1.0f, 1.0f);
-        count += 12;
+        drawtext(TXT_TUTORIAL_LINE15, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_STICK]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE16, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_UP]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE17, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f,
+                 joylabel(control[0].button[KEYALIAS_LEFT]));
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE18, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
+        drawtext(TXT_TUTORIAL_LINE19, (320 | TEXT_CENTER), count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        count += 16;
 
-        keyhighlight  = control[0].key[KEYALIAS_STICK];
-        keyhighlight2 = control[0].key[KEYALIAS_UP];
+        keyhighlight  = control[0].button[KEYALIAS_STICK];
+        keyhighlight2 = control[0].button[KEYALIAS_UP];
       }
 
     if (!game.playreplay)
     {
-      drawtext(TXT_TUTORIAL_MOVEMENT, (536 | TEXT_CENTER), (YtxtMove | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawkeybitmap((526 | TEXT_CENTER), (YtxtButtonRow2 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_LEFT],
+      /* Vita port: the pad legend sits on the left and the four action buttons
+         on the right, mirrored from the keyboard-era layout (the pad cluster
+         was at 526/536/546 with the actions starting at 60).  The action
+         spacing below is unchanged: 96, 96, 112. */
+      drawtext(TXT_TUTORIAL_MOVEMENT, (104 | TEXT_CENTER), (YtxtMove | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawkeybitmap((94 | TEXT_CENTER), (YtxtButtonRow2 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_LEFT],
                     keyhighlight, keyhighlight2);
-      drawkeybitmap((536 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_DOWN],
+      drawkeybitmap((104 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_DOWN],
                     keyhighlight, keyhighlight2);
-      drawkeybitmap((546 | TEXT_CENTER), (YtxtButtonRow2 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_RIGHT],
+      drawkeybitmap((114 | TEXT_CENTER), (YtxtButtonRow2 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_RIGHT],
                     keyhighlight, keyhighlight2);
-      drawkeybitmap((536 | TEXT_CENTER), (YtxtButtonRow1 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_UP],
+      drawkeybitmap((104 | TEXT_CENTER), (YtxtButtonRow1 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_UP],
                     keyhighlight, keyhighlight2);
 
-      count = sizeof(TXT_TUTORIAL_STICK) * 6 + 24;
-      drawtext(TXT_TUTORIAL_STICK, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      count = 276;
+      drawtext(TXT_TUTORIAL_STICK, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
-      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_STICK],
+      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_STICK],
                     keyhighlight, keyhighlight2);
-      count += (((sizeof(TXT_TUTORIAL_STICK) + sizeof(TXT_TUTORIAL_JUMP)) / 2) + 1) * 12; // 96;
-      drawtext(TXT_TUTORIAL_JUMP, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      count += (((sizeof(TXT_TUTORIAL_STICK) + sizeof(TXT_TUTORIAL_JUMP)) / 2) + 1) * 16; // 96;
+      drawtext(TXT_TUTORIAL_JUMP, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
-      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_JUMP],
+      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_JUMP],
                     keyhighlight, keyhighlight2);
-      count += (((sizeof(TXT_TUTORIAL_SLIDE) + sizeof(TXT_TUTORIAL_JUMP)) / 2) + 1) * 12; // 96;
-      drawtext(TXT_TUTORIAL_SLIDE, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      count += (((sizeof(TXT_TUTORIAL_SLIDE) + sizeof(TXT_TUTORIAL_JUMP)) / 2) + 1) * 16; // 96;
+      drawtext(TXT_TUTORIAL_SLIDE, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
-      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_SLIDE],
+      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_SLIDE],
                     keyhighlight, keyhighlight2);
-      count += (((sizeof(TXT_TUTORIAL_SLIDE) + sizeof(TXT_TUTORIAL_HEAVY)) / 2) + 1) * 12; // 96;
-      drawtext(TXT_TUTORIAL_HEAVY, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      count += (((sizeof(TXT_TUTORIAL_SLIDE) + sizeof(TXT_TUTORIAL_HEAVY)) / 2) + 1) * 16; // 112;
+      drawtext(TXT_TUTORIAL_HEAVY, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
-      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_HEAVY],
+      drawkeybitmap((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_HEAVY],
                     keyhighlight, keyhighlight2);
       count += 96;
     }
@@ -1496,62 +1509,63 @@ void gamedisplay(void)
   if (game.playreplay)
     if (keyboard[SCAN_K])
     {
-      drawtext(TXT_TUTORIAL_MOVEMENT, (536 | TEXT_CENTER), (YtxtMove | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawtext(TXT_TUTORIAL_MOVEMENT, (536 | TEXT_CENTER), (YtxtMove | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f, 1.0f);
       keyhighlight = 0;
       if (object[0].axis[0] == -1.0f)
         keyhighlight = 1;
-      drawkeybitmap2((512 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_LEFT],
+      drawkeybitmap2((512 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_LEFT],
                      keyhighlight);
       keyhighlight = 0;
       if (object[0].axis[1] == -1.0f)
         keyhighlight = 1;
-      drawkeybitmap2((536 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_DOWN],
+      drawkeybitmap2((536 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_DOWN],
                      keyhighlight);
       keyhighlight = 0;
       if (object[0].axis[0] == 1.0f)
         keyhighlight = 1;
-      drawkeybitmap2((560 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_RIGHT],
+      drawkeybitmap2((560 | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_RIGHT],
                      keyhighlight);
       keyhighlight = 0;
       if (object[0].axis[1] == 1.0f)
         keyhighlight = 1;
-      drawkeybitmap2((536 | TEXT_CENTER), (YtxtButtonRow1 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_UP],
+      drawkeybitmap2((536 | TEXT_CENTER), (YtxtButtonRow1 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_UP],
                      keyhighlight);
 
       count = 64;
-      drawtext(TXT_TUTORIAL_STICK, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      drawtext(TXT_TUTORIAL_STICK, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
       keyhighlight = 0;
       if ((object[0].button & 1) == 1)
         keyhighlight = 1;
-      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_STICK],
+      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_STICK],
                      keyhighlight);
       count += 96;
-      drawtext(TXT_TUTORIAL_JUMP, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      drawtext(TXT_TUTORIAL_JUMP, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
       keyhighlight = 0;
       if ((object[0].button & 2) == 2)
         keyhighlight = 1;
-      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_JUMP],
+      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_JUMP],
                      keyhighlight);
       count += 96;
-      drawtext(TXT_TUTORIAL_SLIDE, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      drawtext(TXT_TUTORIAL_SLIDE, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
       keyhighlight = 0;
       if ((object[0].button & 4) == 4)
         keyhighlight = 1;
-      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_SLIDE],
+      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_SLIDE],
                      keyhighlight);
       count += 96;
-      drawtext(TXT_TUTORIAL_HEAVY, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 12, 0.75f, 0.75f, 0.75f,
+      drawtext(TXT_TUTORIAL_HEAVY, (count | TEXT_CENTER), (YtxtActionButtons | TEXT_CENTER), 16, 0.75f, 0.75f, 0.75f,
                1.0f);
       keyhighlight = 0;
       if ((object[0].button & 8) == 8)
         keyhighlight = 1;
-      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 12, 12, control[0].key[KEYALIAS_HEAVY],
+      drawkeybitmap2((count | TEXT_CENTER), (YtxtButtonRow3 | TEXT_CENTER), 16, 16, control[0].button[KEYALIAS_HEAVY],
                      keyhighlight);
       count += 96;
     }
+  textpixelsnap = 0;
 #ifndef GLES
   glPopMatrix();
 #endif
@@ -1613,34 +1627,49 @@ void drawtextbitmap(int x, int y, int sizex, int sizey)
   }
 }
 
-void drawkeybitmap(int x, int y, int sizex, int sizey, int keynum, int keyhighlight, int keyhighlight2)
+/* Vita port: the hints and the key legend follow the joystick binding table
+   (control[].button[]) instead of the keyboard one.  keyboard[] is never
+   filled on this port (sdl/event.c only handles WINDOWEVENT and QUIT), so
+   every control[].key[] lookup is dead here.  buttonnum is an SDL joystick
+   button index, as stored in control[0].button[]. */
+static int joypressed(int buttonnum)
+{
+  if (buttonnum < 0)
+    return 0;
+
+  return joystick[control[0].joysticknum].button[buttonnum];
+}
+
+void drawkeybitmap(int x, int y, int sizex, int sizey, int buttonnum, int keyhighlight, int keyhighlight2)
 {
   glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-  //  drawbackground(723,x,y,sizex*2+(strlen(keyboardlabel[keynum])-1)*sizex,sizey*2,640,480);
+  //  drawbackground(723,x,y,sizex*2+(strlen(joylabel(buttonnum))-1)*sizex,sizey*2,640,480);
 
-  if (!keyboard[keynum])
+  if (!joypressed(buttonnum))
   {
-    if (keyhighlight != keynum && keyhighlight2 != keynum)
-      drawtext("/s", x, y, sizex, 1.0f, 1.0f, 1.0f, 1.0f, keyboardlabel[keynum]);
+    if (keyhighlight != buttonnum && keyhighlight2 != buttonnum)
+      drawtext("/s", x, y, sizex, 1.0f, 1.0f, 1.0f, 1.0f, joylabel(buttonnum));
     else
-      drawtext("/s", x, y, sizex, 1.0f, 1.0f, 0.0f, 1.0f, keyboardlabel[keynum]);
+      drawtext("/s", x, y, sizex, 1.0f, 1.0f, 0.0f, 1.0f, joylabel(buttonnum));
   }
   else
   {
-    if (keyhighlight != keynum && keyhighlight2 != keynum)
-      drawtext("/s", x, y, sizex, 0.5f, 0.5f, 1.0f, 1.0f, keyboardlabel[keynum]);
+    if (keyhighlight != buttonnum && keyhighlight2 != buttonnum)
+      drawtext("/s", x, y, sizex, 0.5f, 0.5f, 1.0f, 1.0f, joylabel(buttonnum));
     else
-      drawtext("/s", x, y, sizex, 0.0f, 1.0f, 0.0f, 1.0f, keyboardlabel[keynum]);
+      drawtext("/s", x, y, sizex, 0.0f, 1.0f, 0.0f, 1.0f, joylabel(buttonnum));
   }
 }
 
-void drawkeybitmap2(int x, int y, int sizex, int sizey, int keynum, int highlight)
+void drawkeybitmap2(int x, int y, int sizex, int sizey, int buttonnum, int highlight)
 {
+  int labelwidth = (int)strlen(joylabel(buttonnum));
+
   glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-  drawbackground(723, x, y, sizex * 2 + (strlen(keyboardlabel[keynum]) - 1) * sizex, sizey * 2, 640, 480);
+  drawbackground(723, x, y, sizex * 2 + (labelwidth - 1) * sizex, sizey * 2, 640, 480);
 
   if (!highlight)
-    drawtext("/s", x, y, sizex, 0.5f, 0.5f, 0.5f, 1.0f, keyboardlabel[keynum]);
+    drawtext("/s", x, y, sizex, 0.5f, 0.5f, 0.5f, 1.0f, joylabel(buttonnum));
   else
-    drawtext("/s", x, y, sizex, 0.0f, 1.0f, 0.0f, 1.0f, keyboardlabel[keynum]);
+    drawtext("/s", x, y, sizex, 0.0f, 1.0f, 0.0f, 1.0f, joylabel(buttonnum));
 }

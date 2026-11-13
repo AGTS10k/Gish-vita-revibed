@@ -606,6 +606,44 @@ void setupmenuitems(void)
   strcpy(keyboardlabel[0], TXT_NONE);
 }
 
+/* Vita port: glyph for a joystick button, in SDL_VitaJoystick enumeration order
+   (TRIANGLE, CIRCLE, CROSS, SQUARE, L1, R1, DOWN, LEFT, UP, RIGHT, SELECT,
+   START, ...).  The tutorial hints and the key legend are driven by the
+   joystick binding table (control[].button[]), so they track any remap.
+   Codes 0x80-0x8D live in row 8 of data/font00.tga. */
+char *joylabel(int button)
+{
+  switch (button)
+  {
+  case 0:
+    return "\x85"; /* Triangle */
+  case 1:
+    return "\x86"; /* Circle */
+  case 2:
+    return "\x87"; /* Cross */
+  case 3:
+    return "\x84"; /* Square */
+  case 4:
+    return "\x88\x89"; /* L1, two cells wide */
+  case 5:
+    return "\x8A\x8B"; /* R1, two cells wide */
+  case 6:
+    return "\x82"; /* D-pad down */
+  case 7:
+    return "\x80"; /* D-pad left */
+  case 8:
+    return "\x83"; /* D-pad up */
+  case 9:
+    return "\x81"; /* D-pad right */
+  case 10:
+    return "\x8C"; /* Select */
+  case 11:
+    return "\x8D"; /* Start */
+  }
+
+  return "";
+}
+
 void menutextbox(void)
 {
   int /*count,*/ count2, count3;
