@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../config.h"
 #include "../game/game.h"
+#include "../input/mouse.h"
 #include "../sdl/event.h"
 #include "../video/opengl.h"
 #include "../video/texture.h"
@@ -530,8 +531,10 @@ void drawbackground(int texturenum, int x, int y, int sizex, int sizey, int reso
 void drawmousecursor(int texturenum, int x, int y, int textsize, float red, float green, float blue, float alpha)
 {
 #ifdef __vita__
-  /* Vita port: no mouse cursor. */
-  return;
+  /* Vita port: the pointer is the front touch panel (input/mouse.c).  It only
+     exists while a finger owns it, so there is no cursor to draw at rest. */
+  if (!touchactive)
+    return;
 #endif
   if (!touchcontrols)
   {

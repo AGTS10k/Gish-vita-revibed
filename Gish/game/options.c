@@ -136,12 +136,12 @@ void optionsmenu(void)
       createmenuitem("        ", 480, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       count += 16;
 
-      /* Vita port: the previous porter left these two items commented out but
-         left the width maths around them active.  They land at indices 34 and
-         35, which the handlers at the bottom of this loop already expect
-         (videooptionsmenu() / optionsmenu2()). */
-      createmenuitem(TXT_VIDEOOPTIONS, 320, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_HOTKEY, SCAN_V);
+      /* Vita port: the Video Options screen is not offered on this console, so
+         only TXT_4_PLAYER is created here and it lands at index 34 - which is
+         what the handler at the bottom of this loop expects (optionsmenu2()).
+         The video screen switched the colour depth at runtime (16 bit) and had
+         an Apply button; on the Vita that can leave the GLES surface in a state
+         the game cannot recover from, and there is no video mode to choose. */
       createmenuitem(TXT_4_PLAYER, 160, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       setmenuitem(MO_HOTKEY, SCAN_4);
 
@@ -662,8 +662,6 @@ void optionsmenu(void)
             }
           }
       if (menuitem[34].active)
-        videooptionsmenu();
-      if (menuitem[35].active)
         optionsmenu2();
 
       if (mouse.lmb)
@@ -682,6 +680,10 @@ void optionsmenu(void)
   }
 }
 
+/* The Vita port does not offer this screen (optionsmenu() no longer creates the
+   menu item), because its colour depth switch and Apply button can leave the
+   GLES surface in a state the game cannot recover from.  Kept so the screen is
+   still here if a safe subset is ever wanted on this console. */
 void videooptionsmenu(void)
 {
   int count, count2;

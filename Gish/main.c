@@ -98,6 +98,15 @@ int main(int argc, char *argv[])
 
   flags = SDL_INIT_VIDEO | SDL_INIT_TIMER;
 
+#ifdef __vita__
+  /* The game reads the front touch panel itself (input/mouse.c) and turns a
+     released finger into a click.  SDL's own touch-to-mouse synthesis is
+     already inert here - the SDL_HINT_VITA_TOUCH_MOUSE_DEVICE hint it needs is
+     never set - but switch it off explicitly so nothing can ever compete with
+     the hand-written pointer. */
+  SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+#endif
+
   SDL_Init(flags);
 
   int display_count = 0, display_index = 0, mode_index = 0;

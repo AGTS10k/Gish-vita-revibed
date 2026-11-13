@@ -37,4 +37,10 @@ typedef struct
 
 extern _mouse mouse, prevmouse;
 
+#ifdef __vita__
+/* Non-zero while a finger on the front touch panel owns the pointer.  The
+   cursor is drawn only then, so there is no idle mouse pointer on screen. */
+extern int touchactive;
+#endif
+
 #endif /* GISH_INPUT_MOUSE_H */
