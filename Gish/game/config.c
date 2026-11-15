@@ -207,29 +207,21 @@ void loadconfig(void)
 
   control[0].button[8] = 11;
 
-  control[1].joysticknum = -1;
-  control[1].axis[0]     = 0;
-  control[1].axis[1]     = 1;
-  for (count = 0; count < 4; count++)
-    control[1].button[count] = -1;
-  for (count = 0; count < 4; count++)
-    control[1].button[count + 4] = count;
-
-  control[2].joysticknum = -1;
-  control[2].axis[0]     = 0;
-  control[2].axis[1]     = 1;
-  for (count = 0; count < 4; count++)
-    control[2].button[count] = -1;
-  for (count = 0; count < 4; count++)
-    control[2].button[count + 4] = count;
-
-  control[3].joysticknum = -1;
-  control[3].axis[0]     = 0;
-  control[3].axis[1]     = 1;
-  for (count = 0; count < 4; count++)
-    control[3].button[count] = -1;
-  for (count = 0; count < 4; count++)
-    control[3].button[count + 4] = count;
+  /* Vita port: players 2-4 start with a copy of player 1's pad bindings, so a
+     second controller assigned in the 4 Player menu is playable immediately
+     (d-pad on the movement rows instead of stick-only, and the same face
+     buttons).  They still start with no pad assigned: game.c reads
+     joystick[control[n].joysticknum] without a range check once it is not -1,
+     and a Vita has only the built-in controller.  Key bindings are left alone -
+     there is no keyboard here and the KEY column is gone (options.c). */
+  for (count = 1; count < CONTROLS_LENGTH; count++)
+  {
+    control[count].joysticknum = -1;
+    control[count].axis[0]     = 0;
+    control[count].axis[1]     = 1;
+    for (count2 = 0; count2 < 16; count2++)
+      control[count].button[count2] = control[0].button[count2];
+  }
 
   loadtextfile(userpath(path, "config.txt"));
   optionreadint(&config.resolutionx, "screenwidth=");

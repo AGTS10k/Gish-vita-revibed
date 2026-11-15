@@ -50,6 +50,26 @@ static void drawjoylabel(int button, int x, int y, int textsize)
     drawtext(TXT_BUTTON " /i", x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f, button + 1);
 }
 
+/* Vita port: label for a pad slot (control[].joysticknum).  Player 1's slot is
+   drawn straight to the screen instead of being a menu item (see optionsmenu),
+   so the text has to be selectable without going through createmenuitem(). */
+static char *joynumlabel(int joysticknum)
+{
+  switch (joysticknum)
+  {
+  case 0:
+    return TXT_JOY1;
+  case 1:
+    return TXT_JOY2;
+  case 2:
+    return TXT_JOY3;
+  case 3:
+    return TXT_JOY4;
+  }
+
+  return TXT_NONE;
+}
+
 void optionsmenu(void)
 {
   if (touchcontrols)
@@ -165,32 +185,13 @@ void optionsmenu(void)
       createmenuitem(TXT_4_PLAYER, 160, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       setmenuitem(MO_HOTKEY, SCAN_4);
 
-      count = 112;
-      if (control[0].joysticknum == -1)
-      {
-        createmenuitem(TXT_NONE, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[0].joysticknum, 0);
-      }
-      if (control[0].joysticknum == 0)
-      {
-        createmenuitem(TXT_JOY1, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[0].joysticknum, 1);
-      }
-      if (control[0].joysticknum == 1)
-      {
-        createmenuitem(TXT_JOY2, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[0].joysticknum, 2);
-      }
-      if (control[0].joysticknum == 2)
-      {
-        createmenuitem(TXT_JOY3, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[0].joysticknum, 3);
-      }
-      if (control[0].joysticknum == 3)
-      {
-        createmenuitem(TXT_JOY4, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[0].joysticknum, -1);
-      }
+      /* Vita port: player 1 is always the built-in controller, so its pad slot
+         is display-only.  It used to be a cycling MO_SET item, which let a
+         stray tap (or a future pad-navigation stop) set it to "None" and leave
+         the console with no pad at all - unfixable without touch.  The label
+         is now drawn directly (see the draw section below), so there is no
+         menu item, no hit box, and nothing to land on.  Player 2's slot stays
+         a real item: assigning a second pad there is how Versus starts. */
       count = 304;
 
       if (control[1].joysticknum == -1)
@@ -257,6 +258,9 @@ void optionsmenu(void)
       drawtext(TXT_JOYSTICK, 320, 80, 16, 1.0f, 1.0f, 1.0f, 1.0f);
 
       drawtext(TXT_PLAYER1, 0, 112, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      /* Player 1's pad slot: display-only, drawn where the old item sat and in
+         the same 50% grey an unhighlighted menuitem used. */
+      drawtext(joynumlabel(control[0].joysticknum), 320, 112, 16, 0.5f, 0.5f, 0.5f, 1.0f);
 
       count2 = 0;
       count  = 0;
