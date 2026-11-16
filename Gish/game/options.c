@@ -79,10 +79,22 @@ void optionsmenu(void)
   else
   {
     int count, count2, count3;
+    /* Was each item already waiting for a button before this frame's input?
+       The rebind handlers further down use this so the Start press that opens
+       a row is not also read as the button to bind. */
+    unsigned char rowactive[MAXMENUITEMS];
 
     count = 0;
 
-    joystickmenu = 0;
+    /* Vita port: this screen is pad-navigable now.  It used to force
+       joystickmenu = 0 because it was mouse-only (no way in, no way out with a
+       pad) and because the old two-column layout had no sensible up/down order.
+       With the KEY column gone the items run in one visual column: Back, the
+       nine player-1 rows, the eight player-2 rows, 4 Player, the player-2 pad
+       slot, then Sound and Music.  Down/Up move, Start activates - the same
+       path every other menu uses.  Touch still works, because the hit test in
+       checkmenuitems() runs either way. */
+    joystickmenu = 1;
 
     resetmenuitems();
 
@@ -94,50 +106,6 @@ void optionsmenu(void)
       numofmenuitems = 0;
       createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       setmenuitem(MO_HOTKEY, SCAN_ESC);
-      count = 144;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-
-      count = 336;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-
-      /* Vita port: these sixteen cells are the keyboard rebind targets
-         that used to sit under the KEY column.  There is no keyboard on
-         this console, so they are made unclickable (their labels are
-         blanks anyway); they stay in the list only so the pad cells keep
-         the indices the handlers further down expect. */
-      for (count = 1; count <= 16; count++)
-        menuitem[count].highlight = 0;
-
       count = 144;
       createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       count += 16;
@@ -177,8 +145,9 @@ void optionsmenu(void)
       count += 16;
 
       /* Vita port: the Video Options screen is not offered on this console, so
-         only TXT_4_PLAYER is created here and it lands at index 34 - which is
-         what the handler at the bottom of this loop expects (optionsmenu2()).
+         only TXT_4_PLAYER is created here and it lands at index 18 (Back, the
+         nine player-1 pad rows and the eight player-2 pad rows come first) -
+         which is what the handler at the bottom of this loop expects.
          The video screen switched the colour depth at runtime (16 bit) and had
          an Apply button; on the Vita that can leave the GLES surface in a state
          the game cannot recover from, and there is no video mode to choose. */
@@ -242,6 +211,16 @@ void optionsmenu(void)
       }
 
       checksystemmessages();
+
+      /* Snapshot which rows were already waiting for a button.  checkmenuitems()
+         arms the selected row on this very Start press, and the handler after
+         the frame would otherwise see the same press as the new binding: Start
+         on "Move Left" would bind Start and close the row again, which looks
+         exactly like nothing happened.  One frame later the press edge is gone,
+         and a second, separate press binds normally - including Start. */
+      for (count = 0; count < numofmenuitems; count++)
+        rowactive[count] = (unsigned char)menuitem[count].active;
+
       checkkeyboard();
       checkmouse();
       checkjoystick();
@@ -265,7 +244,7 @@ void optionsmenu(void)
       count2 = 0;
       count  = 0;
       drawtext(TXT_MOVE_LEFT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -277,7 +256,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_MOVE_RIGHT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -289,7 +268,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_MOVE_DOWN, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -301,7 +280,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_MOVE_UP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -313,7 +292,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_STICK, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -325,7 +304,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_JUMP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -337,7 +316,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_SLIDE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -349,7 +328,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_HEAVY, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -361,7 +340,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_START_PAUSE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 17].active)
+      if (!menuitem[count + 1].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -377,7 +356,7 @@ void optionsmenu(void)
       count2 = 1;
       count  = 0;
       drawtext(TXT_MOVE_LEFT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -389,7 +368,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_MOVE_RIGHT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -401,7 +380,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_MOVE_DOWN, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -413,7 +392,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_MOVE_UP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -425,7 +404,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_STICK, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -437,7 +416,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_JUMP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -449,7 +428,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_SLIDE, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -461,7 +440,7 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_HEAVY, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 26].active)
+      if (!menuitem[count + 10].active)
       {
         if (control[count2].button[count] != -1)
           drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -489,63 +468,8 @@ void optionsmenu(void)
       SDL_GL_SwapWindow(globalwindow);
 #endif
 
-      for (count = 0; count < KEYALIAS_LENGTH; count++)
-        if (menuitem[count + 1].active)
-        {
-          for (count2 = 1; count2 < 323; count2++)
-            if (keyboardlabel[count2][0] != 0)
-              if (keyboard[count2] && !prevkeyboard[count2])
-              {
-                control[0].key[count] = count2;
-
-                for (count3 = 0; count3 < 8; count3++)
-                  if (count3 != count)
-                    if (control[0].key[count3] == count2)
-                      control[0].key[count3] = 0;
-
-                for (count3 = 0; count3 < 8; count3++)
-                  if (count3 != count)
-                    if (control[1].key[count3] == count2)
-                      control[1].key[count3] = 0;
-
-                menuitem[count + 1].active = 0;
-              }
-          if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
-          {
-            control[0].key[count]      = 0;
-            menuitem[count + 1].active = 0;
-          }
-        }
-      for (count = 0; count < 8; count++)
-        if (menuitem[count + 9].active)
-        {
-          for (count2 = 1; count2 < 323; count2++)
-            if (keyboardlabel[count2][0] != 0)
-              if (keyboard[count2] && !prevkeyboard[count2])
-              {
-                control[1].key[count] = count2;
-
-                for (count3 = 0; count3 < KEYALIAS_LENGTH; count3++)
-                  if (count3 != count)
-                    if (control[0].key[count3] == count2)
-                      control[0].key[count3] = 0;
-
-                for (count3 = 0; count3 < 8; count3++)
-                  if (count3 != count)
-                    if (control[1].key[count3] == count2)
-                      control[1].key[count3] = 0;
-
-                menuitem[count + 9].active = 0;
-              }
-          if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
-          {
-            control[1].key[count]      = 0;
-            menuitem[count + 9].active = 0;
-          }
-        }
-      if (control[0].joysticknum != -1)
         for (count = 0; count < 9; count++)
-          if (menuitem[count + 17].active)
+          if (menuitem[count + 1].active && rowactive[count + 1])
           {
             for (count2 = 0; count2 < joystick[control[0].joysticknum].numofbuttons; count2++)
               if (joystick[control[0].joysticknum].button[count2]
@@ -565,17 +489,17 @@ void optionsmenu(void)
                 if (control[1].button[count3]==count2)
                   control[1].button[count3]=-1;
                 */
-                menuitem[count + 17].active = 0;
+                menuitem[count + 1].active = 0;
               }
             if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
             {
               control[0].button[count]    = -1;
-              menuitem[count + 17].active = 0;
+              menuitem[count + 1].active = 0;
             }
           }
       if (control[1].joysticknum != -1)
         for (count = 0; count < 8; count++)
-          if (menuitem[count + 26].active)
+          if (menuitem[count + 10].active && rowactive[count + 10])
           {
             for (count2 = 0; count2 < joystick[control[1].joysticknum].numofbuttons; count2++)
               if (joystick[control[1].joysticknum].button[count2]
@@ -595,15 +519,15 @@ void optionsmenu(void)
                       if (control[1].button[count3] == count2)
                         control[1].button[count3] = -1;
 
-                menuitem[count + 26].active = 0;
+                menuitem[count + 10].active = 0;
               }
             if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
             {
               control[1].button[count]    = -1;
-              menuitem[count + 26].active = 0;
+              menuitem[count + 10].active = 0;
             }
           }
-      if (menuitem[34].active)
+      if (menuitem[18].active)
         optionsmenu2();
 
       if (mouse.lmb)
@@ -1017,6 +941,9 @@ void drawsliderbars(void)
 void optionsmenu2(void)
 {
   int count, count2, count3;
+  /* Same activation-press guard as optionsmenu(): was each item already
+     waiting for a button before this frame's input? */
+  unsigned char rowactive[MAXMENUITEMS];
 
   count = 0;
 
@@ -1031,52 +958,6 @@ void optionsmenu2(void)
     createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
     setmenuitem(MO_HOTKEY, SCAN_ESC);
     count = 144;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-
-    count = 336;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-
-    /* Vita port: these sixteen cells are the keyboard rebind targets
-       that used to sit under the KEY column.  There is no keyboard on
-       this console, so they are made unclickable (their labels are
-       blanks anyway); they stay in the list only so the pad cells keep
-       the indices the handlers further down expect. */
-    for (count = 1; count <= 16; count++)
-      menuitem[count].highlight = 0;
-
-    count = 144;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
     createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
     count += 16;
     createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -1166,6 +1047,12 @@ void optionsmenu2(void)
     }
 
     checksystemmessages();
+
+    /* See optionsmenu(): remember which rows were already armed, so the Start
+       press that arms one is not mistaken for the binding itself. */
+    for (count = 0; count < numofmenuitems; count++)
+      rowactive[count] = (unsigned char)menuitem[count].active;
+
     checkkeyboard();
     checkmouse();
     checkjoystick();
@@ -1186,7 +1073,7 @@ void optionsmenu2(void)
     count2 = 2;
     count  = 0;
     drawtext(TXT_MOVE_LEFT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1198,7 +1085,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_MOVE_RIGHT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1210,7 +1097,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_MOVE_DOWN, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1222,7 +1109,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_MOVE_UP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1234,7 +1121,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_STICK, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1246,7 +1133,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_JUMP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1258,7 +1145,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_SLIDE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1270,7 +1157,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_HEAVY, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 17].active)
+    if (!menuitem[count + 1].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
@@ -1282,7 +1169,7 @@ void optionsmenu2(void)
     count++;
     /*
     drawtext("Start//Pause",0,144+count*16,16,0.75f,0.75f,0.75f,1.0f);
-    if (!menuitem[count+17].active)
+    if (!menuitem[count + 1].active)
       {
       if (control[count2].button[count]!=-1)
         drawtext(TXT_BUTTON" /i",320,144+count*16,16,1.0f,1.0f,1.0f,1.0f,control[count2].button[count]+1);
@@ -1299,7 +1186,7 @@ void optionsmenu2(void)
     count2 = 3;
     count  = 0;
     drawtext(TXT_MOVE_LEFT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1311,7 +1198,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_MOVE_RIGHT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1323,7 +1210,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_MOVE_DOWN, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1335,7 +1222,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_MOVE_UP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1347,7 +1234,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_STICK, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1359,7 +1246,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_JUMP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1371,7 +1258,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_SLIDE, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1383,7 +1270,7 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_HEAVY, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 26].active)
+    if (!menuitem[count + 9].active)
     {
       if (control[count2].button[count] != -1)
         drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
@@ -1409,63 +1296,8 @@ void optionsmenu2(void)
     SDL_GL_SwapWindow(globalwindow);
 #endif
 
-    for (count = 0; count < KEYALIAS_LENGTH; count++)
-      if (menuitem[count + 1].active)
-      {
-        for (count2 = 1; count2 < 323; count2++)
-          if (keyboardlabel[count2][0] != 0)
-            if (keyboard[count2] && !prevkeyboard[count2])
-            {
-              control[2].key[count] = count2;
-
-              for (count3 = 0; count3 < KEYALIAS_LENGTH; count3++)
-                if (count3 != count)
-                  if (control[2].key[count3] == count2)
-                    control[2].key[count3] = 0;
-
-              for (count3 = 0; count3 < 8; count3++)
-                if (count3 != count)
-                  if (control[3].key[count3] == count2)
-                    control[3].key[count3] = 0;
-
-              menuitem[count + 1].active = 0;
-            }
-        if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
-        {
-          control[2].key[count]      = 0;
-          menuitem[count + 1].active = 0;
-        }
-      }
-    for (count = 0; count < 8; count++)
-      if (menuitem[count + 9].active)
-      {
-        for (count2 = 1; count2 < 323; count2++)
-          if (keyboardlabel[count2][0] != 0)
-            if (keyboard[count2] && !prevkeyboard[count2])
-            {
-              control[3].key[count] = count2;
-
-              for (count3 = 0; count3 < 8; count3++)
-                if (count3 != count)
-                  if (control[2].key[count3] == count2)
-                    control[2].key[count3] = 0;
-
-              for (count3 = 0; count3 < 8; count3++)
-                if (count3 != count)
-                  if (control[3].key[count3] == count2)
-                    control[3].key[count3] = 0;
-
-              menuitem[count + 9].active = 0;
-            }
-        if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
-        {
-          control[3].key[count]      = 0;
-          menuitem[count + 9].active = 0;
-        }
-      }
-    if (control[2].joysticknum != -1)
-      for (count = 0; count < 9; count++)
-        if (menuitem[count + 17].active)
+      for (count = 0; count < 8; count++)
+        if (menuitem[count + 1].active && rowactive[count + 1])
         {
           for (count2 = 0; count2 < joystick[control[2].joysticknum].numofbuttons; count2++)
             if (joystick[control[2].joysticknum].button[count2] && !prevjoystick[control[2].joysticknum].button[count2])
@@ -1478,17 +1310,17 @@ void optionsmenu2(void)
                     if (control[2].button[count3] == count2)
                       control[2].button[count3] = -1;
 
-              menuitem[count + 17].active = 0;
+              menuitem[count + 1].active = 0;
             }
           if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
           {
             control[2].button[count]    = -1;
-            menuitem[count + 17].active = 0;
+            menuitem[count + 1].active = 0;
           }
         }
     if (control[3].joysticknum != -1)
       for (count = 0; count < 8; count++)
-        if (menuitem[count + 26].active)
+        if (menuitem[count + 9].active && rowactive[count + 9])
         {
           for (count2 = 0; count2 < joystick[control[3].joysticknum].numofbuttons; count2++)
             if (joystick[control[3].joysticknum].button[count2] && !prevjoystick[control[3].joysticknum].button[count2])
@@ -1501,12 +1333,12 @@ void optionsmenu2(void)
                     if (control[3].button[count3] == count2)
                       control[3].button[count3] = -1;
 
-              menuitem[count + 26].active = 0;
+              menuitem[count + 9].active = 0;
             }
           if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
           {
             control[3].button[count]    = -1;
-            menuitem[count + 26].active = 0;
+            menuitem[count + 9].active = 0;
           }
         }
   }
