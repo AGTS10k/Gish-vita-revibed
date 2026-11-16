@@ -66,6 +66,43 @@ static void drawfixedlabel(int button, int x, int y, int textsize, char *none)
     drawtext(none, x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
 }
 
+/* Vita port: draw one bindable row's value.  The row the pad (or the mouse)
+   has selected is wrapped in square brackets, and a row waiting for a button
+   shows a bracketed "?" - the same value slot, so nothing shifts when the
+   selection moves or a rebind starts.  This is the only cue these rows can
+   have: checkmenuitems() cannot brighten them, because their menu label is
+   blank and their value is drawn here, outside drawmenuitems().
+
+   item is the menuitem index that owns this row's highlight/active state.
+   Brackets are drawn at the fixed brightness of the value itself and grow
+   outwards: "[" one cell before the value, "]" one cell past its end, so the
+   two-cell L1/R1 glyphs and the "Button 12" fallback stay enclosed.  "none"
+   is what to show when nothing is bound (TXT_AXIS or TXT_NONE). */
+static void drawbindlabel(int button, int item, int x, int y, int textsize, char *none)
+{
+  char text[64];
+  int len;
+
+  /* snprintf returns the written length, which is what the right bracket
+     needs; strlen() is not used in this file. */
+  if (menuitem[item].active)
+    len = snprintf(text, sizeof(text), "?");
+  else if (button >= 0 && button <= 11)
+    len = snprintf(text, sizeof(text), "%s", joylabel(button));
+  else if (button > 11)
+    len = snprintf(text, sizeof(text), TXT_BUTTON " %d", button + 1);
+  else
+    len = snprintf(text, sizeof(text), "%s", none);
+
+  if (menuitem[item].active || menuitem[item].highlight >= 2)
+  {
+    drawtext("[", x - textsize, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawtext("]", x + len * textsize, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
+  }
+
+  drawtext(text, x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
+}
+
 /* Vita port: the pad buttons that may never be bound from inside the game -
    d-pad down/left/up/right (6-9), Select (10) and Start (11).  The d-pad and
    Start drive menu navigation (checkmenuitems() moves with buttons 2/3 and
@@ -291,51 +328,19 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_STICK, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count - 3].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
       count++;
 
       drawtext(TXT_JUMP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count - 3].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
       count++;
 
       drawtext(TXT_SLIDE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count - 3].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
       count++;
 
       drawtext(TXT_HEAVY, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count - 3].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
       count++;
 
       drawtext(TXT_START_PAUSE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
@@ -363,51 +368,19 @@ void optionsmenu(void)
       count++;
 
       drawtext(TXT_STICK, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 1].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
       count++;
 
       drawtext(TXT_JUMP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 1].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
       count++;
 
       drawtext(TXT_SLIDE, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 1].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
       count++;
 
       drawtext(TXT_HEAVY, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      if (!menuitem[count + 1].active)
-      {
-        if (control[count2].button[count] != -1)
-          drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-        else
-          drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      }
-      else
-        drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
       count++;
 
       if (control[0].joysticknum != -1)
@@ -1059,51 +1032,19 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_STICK, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count - 3].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
     count++;
 
     drawtext(TXT_JUMP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count - 3].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
     count++;
 
     drawtext(TXT_SLIDE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count - 3].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
     count++;
 
     drawtext(TXT_HEAVY, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count - 3].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 144 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 144 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
     count++;
     /*
     drawtext("Start//Pause",0,144+count*16,16,0.75f,0.75f,0.75f,1.0f);
@@ -1140,51 +1081,19 @@ void optionsmenu2(void)
     count++;
 
     drawtext(TXT_STICK, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 1].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
     count++;
 
     drawtext(TXT_JUMP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 1].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
     count++;
 
     drawtext(TXT_SLIDE, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 1].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
     count++;
 
     drawtext(TXT_HEAVY, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    if (!menuitem[count + 1].active)
-    {
-      if (control[count2].button[count] != -1)
-        drawjoylabel(control[count2].button[count], 320, 336 + count * 16, 16);
-      else
-        drawtext(TXT_NONE, 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    else
-      drawtext("?", 320, 336 + count * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
     count++;
 
     if (control[2].joysticknum != -1)
