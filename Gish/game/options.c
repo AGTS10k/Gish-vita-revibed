@@ -103,6 +103,65 @@ static void drawbindlabel(int button, int item, int x, int y, int textsize, char
   drawtext(text, x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
 }
 
+/* Vita port: the volume rows.  The original Options screen had a drag-only bar
+   under each Sound/Music toggle, which a pad cannot operate, so each row now
+   reads "- N% +": two ordinary menu items either side of a plain text readout.
+   The buttons are MO_FUNCTION items, so checkmenuitems() calls them and clears
+   `active` for us (see the loop at the bottom of that function); the number is
+   only ever drawn, never an item, so it cannot be selected, clicked or armed.
+
+   Stepping works from the rounded percentage instead of the float: 0.05f is
+   not representable exactly, so adding it repeatedly would drift away from the
+   value config.txt stores (that is (int)(volume * 100)).  Reading the
+   percentage, stepping it as an int and converting back keeps every readout an
+   exact multiple of 5; a value that started elsewhere (config.txt can say 37)
+   lands on the neighbouring multiple on the first press. */
+static void adjustvolume(float *volume, int step)
+{
+  int percent = (int)(*volume * 100.0f + 0.5f) + step;
+
+  if (percent < 0)
+    percent = 0;
+  if (percent > 100)
+    percent = 100;
+
+  *volume = (float)percent / 100.0f;
+}
+
+static void soundvolumedown(void)
+{
+  adjustvolume(&option.soundvolume, -5);
+}
+
+static void soundvolumeup(void)
+{
+  adjustvolume(&option.soundvolume, 5);
+}
+
+static void musicvolumedown(void)
+{
+  adjustvolume(&option.musicvolume, -5);
+}
+
+static void musicvolumeup(void)
+{
+  adjustvolume(&option.musicvolume, 5);
+}
+
+/* The readout between the two buttons, centred in the gap they leave.  x is
+   the column's left edge (0 for Sound, 320 for Music), so the readout sits at
+   the same offset the items around it use.  brightness matches what
+   drawmenuitems() does with an item's colours - (highlight + 1) / 4 - so a
+   disabled row's readout dims with its buttons: 0.25 for disabled, 1.0 for
+   normal.  It is a plain string, so there is nothing to dim automatically. */
+static void drawvolume(float volume, int x, int y, float brightness)
+{
+  char text[8];
+
+  sprintf(text, "%d%%", (int)(volume * 100.0f + 0.5f));
+  drawtext(text, (x + 232) | TEXT_CENTER, y, 16, brightness, brightness, brightness, 1.0f);
+}
+
 /* Vita port: the pad buttons that may never be bound from inside the game -
    d-pad down/left/up/right (6-9), Select (10) and Start (11).  The d-pad and
    Start drive menu navigation (checkmenuitems() moves with buttons 2/3 and
@@ -155,11 +214,15 @@ void optionsmenu(void)
     /* Vita port: this screen is pad-navigable now.  It used to force
        joystickmenu = 0 because it was mouse-only (no way in, no way out with a
        pad) and because the old two-column layout had no sensible up/down order.
-       With the KEY column gone the items run in one visual column: Back, the
+       With the KEY column gone the items run in one visual column: Save, the
        four rebindable player-1 rows, the four rebindable player-2 rows,
-       4 Player, the player-2 pad slot, then Sound and Music.  Down/Up move,
-       Start activates - the same path every other menu uses.  Touch still
-       works, because the hit test in checkmenuitems() runs either way. */
+       4 Player, the player-2 pad slot, then one line holding two groups: the
+       Sound row (toggle, "-", "+") at x = 0 and the Music row (toggle, "-",
+       "+") at x = 320.  The buttons exist only while their toggle is on, and
+       Music is additionally disabled - dim, and skipped by the navigation - while
+       Sound is Off, because Sound Off mutes everything.  Down/Up move, Start
+       activates - the same path every other menu uses.  Touch still works,
+       because the hit test in checkmenuitems() runs either way. */
     joystickmenu = 1;
 
     resetmenuitems();
@@ -170,7 +233,12 @@ void optionsmenu(void)
       glClear(GL_COLOR_BUFFER_BIT);
 
       numofmenuitems = 0;
-      createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      /* Vita port: "Back" is called "Save" now, because leaving this screen
+         writes config.txt (see the saveconfig() call after the loop) - the
+         old Exit-item-only save was never reached when the app was closed
+         from the LiveArea.  ESC still closes the screen; the label has no
+         hotkey letter because ESC has no letter to highlight. */
+      createmenuitem(TXT_SAVE, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       setmenuitem(MO_HOTKEY, SCAN_ESC);
       /* Vita port: only the four rebindable rows (Stick, Jump, Slide, Heavy -
          buttons 4-7) get menu items here and at y=400 below.  The d-pad and
@@ -245,6 +313,16 @@ void optionsmenu(void)
       {
         createmenuitem(TXT_SOUND_ON, 0, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.sound, 0);
+        /* Vita port: the "- N% +" volume row (see adjustvolume()).  The two
+           groups are identical and exactly 320 apart: the toggle at x, "-" at
+           x + 160, the readout centred at x + 232 and "+" at x + 288 - i.e.
+           the span the old drag bar used.  Sound is the left column (x = 0)
+           and Music the right one (x = 320) on the same line, so the two read
+           as a pair; Music used to sit on a line of its own at y = 48. */
+        createmenuitem("-", 160, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        setmenuitem(MO_FUNCTION, soundvolumedown);
+        createmenuitem("+", 288, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        setmenuitem(MO_FUNCTION, soundvolumeup);
       }
       else
       {
@@ -253,13 +331,34 @@ void optionsmenu(void)
       }
       if (option.music)
       {
-        createmenuitem(TXT_MUSIC_ON, 0, 48, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        createmenuitem(TXT_MUSIC_ON, 320, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.music, 0);
+        /* See the sound row above.  Sound Off is a master mute (stock 1.53
+           behaviour - see the knowledge file), so Music does nothing while
+           Sound is Off: the whole row is then shown dimmed and cannot be
+           used.  MO_HIGHLIGHT 0 is what does it - checkmenuitems() skips the
+           item entirely (no hit test, no hotkey, no activation) and
+           drawmenuitems() draws it at 25% brightness.  That includes the
+           toggle itself, so Music cannot be switched while it is mute; turn
+           Sound back on to reach it.  This is the first real use of the
+           "disabled item" scheme the menu rework will build on. */
+        if (!option.sound)
+          setmenuitem(MO_HIGHLIGHT, 0);
+        createmenuitem("-", 480, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        setmenuitem(MO_FUNCTION, musicvolumedown);
+        if (!option.sound)
+          setmenuitem(MO_HIGHLIGHT, 0);
+        createmenuitem("+", 608, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        setmenuitem(MO_FUNCTION, musicvolumeup);
+        if (!option.sound)
+          setmenuitem(MO_HIGHLIGHT, 0);
       }
       else
       {
-        createmenuitem(TXT_MUSIC_OFF, 0, 48, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        createmenuitem(TXT_MUSIC_OFF, 320, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.music, 1);
+        if (!option.sound)
+          setmenuitem(MO_HIGHLIGHT, 0);
       }
 
       checksystemmessages();
@@ -388,9 +487,25 @@ void optionsmenu(void)
       if (control[1].joysticknum != -1)
         drawtext(joystick[control[1].joysticknum].name, 320, 320, 10, 0.5f, 0.5f, 0.5f, 1.0f);
 
+      /* Vita port: the percent readouts of the two volume rows.  Drawn here,
+         not as menu items, so the number cannot be selected or clicked - only
+         the "-" and "+" either side of it can.  Same condition as the item
+         creation above, so nothing is left showing when its toggle is off.
+         Sound is the left column, Music the right one on the same line; the
+         Music readout dims to the 25% that drawmenuitems() gives a disabled
+         row while Sound is Off, so text and buttons match. */
+      if (option.sound)
+        drawvolume(option.soundvolume, 0, 32, 1.0f);
+      if (option.music)
+        drawvolume(option.musicvolume, 320, 32, option.sound ? 1.0f : 0.25f);
+
       drawmenuitems();
 
-      drawsliderbars();
+      /* Vita port: the drag-only volume bars are replaced by the "- N% +" rows
+         above, so drawsliderbars() is not called any more.  It is still
+         compiled (options.h declares it); restore this call to bring the bars
+         back. */
+      /* drawsliderbars(); */
 
       drawmousecursor(768 + font.cursornum, mouse.x, mouse.y, 16, 1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -481,6 +596,11 @@ void optionsmenu(void)
       if (menuitem[9].active)
         optionsmenu2();
 
+      /* Vita port: the old drag-only volume bars used to be read here.  They
+         are replaced by the "- N% +" rows, whose buttons go through
+         checkmenuitems() like every other item.  Kept, commented, in case the
+         bars come back.
+
       if (mouse.lmb)
         if (mouse.x >= 160 && mouse.x < 288)
         {
@@ -489,11 +609,24 @@ void optionsmenu(void)
           if (mouse.y >= 48 && mouse.y < 64)
             option.musicvolume = (float)(mouse.x - 160) / 128.0f;
         }
+      */
     }
 
     resetmenuitems();
 
     joystickmenu = 1;
+
+    /* Vita port: write config.txt as soon as the player backs out of Options.
+       The only other saves are the one at boot (main.c, after loadconfig) and
+       the one after mainmenu() returns, i.e. after the Exit item - and the
+       Vita has no Exit item worth trusting: closing the application from the
+       LiveArea kills the process without reaching that code, so every volume
+       change, pad assignment and rebind made here was silently lost.  The file
+       is small and saveconfig() rewrites it from memory, so a write per Back
+       is cheap.  This is also reached when windowinfo.shutdown ends the loop.
+       The 4 Player screen needs nothing of its own: it returns here, and the
+       Back that leaves this screen saves players 3 and 4 as well. */
+    saveconfig();
   }
 }
 
@@ -660,6 +793,10 @@ void videooptionsmenu(void)
   resetmenuitems();
 }
 
+/* Vita port: dead code since the volume bars became "- N% +" rows (see
+   adjustvolume() in this file).  Nothing calls this any more - the call site
+   in optionsmenu() is commented out.  Kept because it is the only remaining
+   description of the original bar geometry, and it costs nothing to build. */
 void drawsliderbars(void)
 {
   float vec[3];

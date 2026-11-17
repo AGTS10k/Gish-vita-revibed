@@ -53,7 +53,7 @@ char keyboardlabel[323][16];
 
 void checkmenuitems(void)
 {
-  int count, count2;
+  int count, count2, count3;
 
   for (count = 0; count < numofmenuitems; count++)
     if ((mouse.lmb && !prevmouse.lmb) || menuitem[count].repeat)
@@ -146,16 +146,32 @@ void checkmenuitems(void)
       if (joymenunum >= numofmenuitems)
         joymenunum = 0;
 
+      /* Vita port: step over disabled items.  highlight == 0 marks an item that
+         exists but cannot be used (the Music row while Sound is Off), and such
+         items come in runs, so a single advance is not enough: the loop walks
+         in the pressed direction until it finds a usable item, wrapping like
+         the plain step above.  With no input (count2 == 0) it moves forward,
+         which is how the selection gets off an item that just became disabled
+         under it - e.g. Sound switched off while Music was selected.  If every
+         item were disabled the loop gives up after one full lap; that is
+         harmless, nothing can be activated anyway. */
       if (menuitem[joymenunum].highlight == 0)
       {
         if (count2 == 0)
           count2 = 1;
-        joymenunum += count2;
 
-        if (joymenunum < 0)
-          joymenunum = numofmenuitems - 1;
-        if (joymenunum >= numofmenuitems)
-          joymenunum = 0;
+        for (count3 = 0; count3 < numofmenuitems; count3++)
+        {
+          joymenunum += count2;
+
+          if (joymenunum < 0)
+            joymenunum = numofmenuitems - 1;
+          if (joymenunum >= numofmenuitems)
+            joymenunum = 0;
+
+          if (menuitem[joymenunum].highlight != 0)
+            break;
+        }
       }
     }
 
