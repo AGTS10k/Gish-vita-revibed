@@ -150,16 +150,19 @@ static void musicvolumeup(void)
 
 /* The readout between the two buttons, centred in the gap they leave.  x is
    the column's left edge (0 for Sound, 320 for Music), so the readout sits at
-   the same offset the items around it use.  brightness matches what
-   drawmenuitems() does with an item's colours - (highlight + 1) / 4 - so a
-   disabled row's readout dims with its buttons: 0.25 for disabled, 1.0 for
-   normal.  It is a plain string, so there is nothing to dim automatically. */
+   the same offset the items around it use: "-" ends at x + 176, the centre is
+   x + 216 and "+" starts at x + 256.  Centring rather than left-aligning keeps
+   the two gaps equal whatever the digit count ("100%" is four glyphs, "5%" is
+   two).  brightness matches what drawmenuitems() does with an item's colours -
+   (highlight + 1) / 4 - so a disabled row's readout dims with its buttons:
+   0.25 for disabled, 1.0 for normal.  It is a plain string, so there is
+   nothing to dim automatically. */
 static void drawvolume(float volume, int x, int y, float brightness)
 {
   char text[8];
 
   sprintf(text, "%d%%", (int)(volume * 100.0f + 0.5f));
-  drawtext(text, (x + 232) | TEXT_CENTER, y, 16, brightness, brightness, brightness, 1.0f);
+  drawtext(text, (x + 216) | TEXT_CENTER, y, 16, brightness, brightness, brightness, 1.0f);
 }
 
 /* Vita port: the pad buttons that may never be bound from inside the game -
@@ -218,11 +221,11 @@ void optionsmenu(void)
        four rebindable player-1 rows, the four rebindable player-2 rows,
        4 Player, the player-2 pad slot, then one line holding two groups: the
        Sound row (toggle, "-", "+") at x = 0 and the Music row (toggle, "-",
-       "+") at x = 320.  The buttons exist only while their toggle is on, and
-       Music is additionally disabled - dim, and skipped by the navigation - while
-       Sound is Off, because Sound Off mutes everything.  Down/Up move, Start
-       activates - the same path every other menu uses.  Touch still works,
-       because the hit test in checkmenuitems() runs either way. */
+       "+") at x = 320.  All three items of each group always exist; a group
+       whose toggle is off is drawn dim and is skipped by the navigation, so
+       the item order (and therefore every index below) never changes.  Down/Up
+       move, Start activates - the same path every other menu uses.  Touch
+       still works, because the hit test in checkmenuitems() runs either way. */
     joystickmenu = 1;
 
     resetmenuitems();
@@ -309,57 +312,74 @@ void optionsmenu(void)
         setmenuitem(MO_SET, &control[1].joysticknum, -1);
       }
 
+      /* Vita port: the "- N% +" volume rows (see adjustvolume()).  Both groups
+         are laid out identically and exactly 320 apart: the toggle at x, "-"
+         at x + 160, the readout centred at x + 216 and "+" at x + 256.  Sound
+         is the left column (x = 0) and Music the right one (x = 320) on the
+         same line, so the two read as a pair; Music used to sit on a line of
+         its own at y = 48.  The gaps work out at 8 px either side of a
+         four-glyph "100%" and 16 px around a three-glyph "50%", i.e. the row
+         reads as one control rather than three spread-out labels.  To widen it
+         again, move the readout centre and "+" right together.
+
+         All three items of a group are created every frame; only their state
+         changes.  A group whose toggle is off stays on screen as a dimmed,
+         unusable row (the user's choice - the earlier build removed it, which
+         also moved every later item's index around), so the item order below
+         is fixed: Sound 11, sound "-" 12, sound "+" 13, Music 14, music "-"
+         15, music "+" 16.  Disabling is MO_HIGHLIGHT 0: checkmenuitems() then
+         skips the item entirely (no hit test, no hotkey, no activation) and
+         drawmenuitems() draws it at 25% brightness instead of the usual 50%. */
       if (option.sound)
       {
         createmenuitem(TXT_SOUND_ON, 0, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.sound, 0);
-        /* Vita port: the "- N% +" volume row (see adjustvolume()).  The two
-           groups are identical and exactly 320 apart: the toggle at x, "-" at
-           x + 160, the readout centred at x + 232 and "+" at x + 288 - i.e.
-           the span the old drag bar used.  Sound is the left column (x = 0)
-           and Music the right one (x = 320) on the same line, so the two read
-           as a pair; Music used to sit on a line of its own at y = 48. */
-        createmenuitem("-", 160, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_FUNCTION, soundvolumedown);
-        createmenuitem("+", 288, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_FUNCTION, soundvolumeup);
       }
       else
       {
         createmenuitem(TXT_SOUND_OFF, 0, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.sound, 1);
       }
+      /* Sound Off is a master mute (stock 1.53), so its own volume has nothing
+         to act on: both buttons are disabled.  The toggle above stays live -
+         it is the only way back on. */
+      createmenuitem("-", 160, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, soundvolumedown);
+      if (!option.sound)
+        setmenuitem(MO_HIGHLIGHT, 0);
+      createmenuitem("+", 256, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, soundvolumeup);
+      if (!option.sound)
+        setmenuitem(MO_HIGHLIGHT, 0);
+
       if (option.music)
       {
         createmenuitem(TXT_MUSIC_ON, 320, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.music, 0);
-        /* See the sound row above.  Sound Off is a master mute (stock 1.53
-           behaviour - see the knowledge file), so Music does nothing while
-           Sound is Off: the whole row is then shown dimmed and cannot be
-           used.  MO_HIGHLIGHT 0 is what does it - checkmenuitems() skips the
-           item entirely (no hit test, no hotkey, no activation) and
-           drawmenuitems() draws it at 25% brightness.  That includes the
-           toggle itself, so Music cannot be switched while it is mute; turn
-           Sound back on to reach it.  This is the first real use of the
-           "disabled item" scheme the menu rework will build on. */
-        if (!option.sound)
-          setmenuitem(MO_HIGHLIGHT, 0);
-        createmenuitem("-", 480, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_FUNCTION, musicvolumedown);
-        if (!option.sound)
-          setmenuitem(MO_HIGHLIGHT, 0);
-        createmenuitem("+", 608, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_FUNCTION, musicvolumeup);
-        if (!option.sound)
-          setmenuitem(MO_HIGHLIGHT, 0);
       }
       else
       {
         createmenuitem(TXT_MUSIC_OFF, 320, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.music, 1);
-        if (!option.sound)
-          setmenuitem(MO_HIGHLIGHT, 0);
       }
+      /* The Music toggle is disabled only by Sound Off (master mute - see the
+         knowledge file), never by Music being off: that toggle is the way back
+         on.  The Music group is disabled by either - Music off means there is
+         nothing to adjust, Sound off means Music does nothing at all.  Both
+         cases share one condition, so they look identical (the same 25%) and
+         cannot stack into something dimmer or leave a button live that the
+         other case would grey: with Music already off, turning Sound off
+         changes nothing about this row. */
+      if (!option.sound)
+        setmenuitem(MO_HIGHLIGHT, 0);
+      createmenuitem("-", 480, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, musicvolumedown);
+      if (!option.music || !option.sound)
+        setmenuitem(MO_HIGHLIGHT, 0);
+      createmenuitem("+", 576, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, musicvolumeup);
+      if (!option.music || !option.sound)
+        setmenuitem(MO_HIGHLIGHT, 0);
 
       checksystemmessages();
 
@@ -489,15 +509,13 @@ void optionsmenu(void)
 
       /* Vita port: the percent readouts of the two volume rows.  Drawn here,
          not as menu items, so the number cannot be selected or clicked - only
-         the "-" and "+" either side of it can.  Same condition as the item
-         creation above, so nothing is left showing when its toggle is off.
-         Sound is the left column, Music the right one on the same line; the
-         Music readout dims to the 25% that drawmenuitems() gives a disabled
-         row while Sound is Off, so text and buttons match. */
-      if (option.sound)
-        drawvolume(option.soundvolume, 0, 32, 1.0f);
-      if (option.music)
-        drawvolume(option.musicvolume, 320, 32, option.sound ? 1.0f : 0.25f);
+         the "-" and "+" either side of it can.  They are drawn unconditionally
+         now, because the groups themselves are always on screen; brightness
+         mirrors drawmenuitems()'s dimming - 1.0 for a usable row, 0.25 for a
+         disabled one - under exactly the same conditions the items use, so the
+         number can never be brighter or dimmer than its buttons. */
+      drawvolume(option.soundvolume, 0, 32, option.sound ? 1.0f : 0.25f);
+      drawvolume(option.musicvolume, 320, 32, (option.music && option.sound) ? 1.0f : 0.25f);
 
       drawmenuitems();
 
