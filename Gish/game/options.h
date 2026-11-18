@@ -27,8 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 void optionsmenu(void);
 void videooptionsmenu(void);
-void drawsliderbars(void);
-void optionsmenu2(void);
+void controlsmenu(void);
 
 typedef enum
 {

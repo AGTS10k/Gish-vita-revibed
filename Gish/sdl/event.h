@@ -49,4 +49,7 @@ extern int renderareax, renderareay, renderareaw, renderareah;
 extern int hudareax, hudareay, hudareaw, hudareah;
 extern float hudfrustumscale;
 
+/* Recomputes the render and HUD areas from config.keepaspect (main.c). */
+void setupviewport(void);
+
 #endif /* GISH_SDL_EVENT_H */

@@ -38,34 +38,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 _option option;
 _control control[CONTROLS_LENGTH];
 
-/* Vita port: draw a pad binding as the button's own glyph instead of
-   "Button N".  joylabel() knows the twelve SDL Vita buttons (face, d-pad,
-   L1/R1, Select/Start); anything else - a non-Vita pad with more buttons -
-   falls through to the old plain number so the binding stays readable. */
-static void drawjoylabel(int button, int x, int y, int textsize)
-{
-  if (button >= 0 && button <= 11)
-    drawtext(joylabel(button), x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
-  else
-    drawtext(TXT_BUTTON " /i", x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f, button + 1);
-}
-
-/* Vita port: the same glyph, for a row that cannot be rebound - the d-pad,
-   Start, and player 1's controller slot.  There is no menu item behind it, so
-   it can be neither clicked nor reached by pad navigation, but it is drawn at
-   full brightness like an editable cell: the user asked to drop the grey cue
-   for now.  "none" is what to show when nothing is bound: TXT_AXIS on the
-   movement rows (stick only), TXT_NONE on the action rows. */
-static void drawfixedlabel(int button, int x, int y, int textsize, char *none)
-{
-  if (button >= 0 && button <= 11)
-    drawtext(joylabel(button), x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
-  else if (button > 11)
-    drawtext(TXT_BUTTON " /i", x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f, button + 1);
-  else
-    drawtext(none, x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
-}
-
 /* Vita port: draw one bindable row's value.  The row the pad (or the mouse)
    has selected is wrapped in square brackets, and a row waiting for a button
    shows a bracketed "?" - the same value slot, so nothing shifts when the
@@ -77,11 +49,16 @@ static void drawfixedlabel(int button, int x, int y, int textsize, char *none)
    Brackets are drawn at the fixed brightness of the value itself and grow
    outwards: "[" one cell before the value, "]" one cell past its end, so the
    two-cell L1/R1 glyphs and the "Button 12" fallback stay enclosed.  "none"
-   is what to show when nothing is bound (TXT_AXIS or TXT_NONE). */
+   is what to show when nothing is bound (TXT_AXIS or TXT_NONE).
+
+   highlight 0 marks a row that cannot be used at all - its player has no pad
+   assigned.  drawmenuitems() never touches this value, so it is dimmed here to
+   the same 25% a disabled menu item gets. */
 static void drawbindlabel(int button, int item, int x, int y, int textsize, char *none)
 {
   char text[64];
   int len;
+  float brightness;
 
   /* snprintf returns the written length, which is what the right bracket
      needs; strlen() is not used in this file. */
@@ -100,7 +77,8 @@ static void drawbindlabel(int button, int item, int x, int y, int textsize, char
     drawtext("]", x + len * textsize, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
   }
 
-  drawtext(text, x, y, textsize, 1.0f, 1.0f, 1.0f, 1.0f);
+  brightness = menuitem[item].highlight == 0 ? 0.25f : 1.0f;
+  drawtext(text, x, y, textsize, brightness, brightness, brightness, 1.0f);
 }
 
 /* Vita port: the volume rows.  The original Options screen had a drag-only bar
@@ -198,6 +176,97 @@ static char *joynumlabel(int joysticknum)
   return TXT_NONE;
 }
 
+/* Vita port: the port-only settings at the bottom of the hub are plain labels
+   with one value item each.  The label is drawn by drawtext() and is not a menu
+   item, so the row is a single navigation stop and the only thing a click or
+   Start can hit is the value slot on the right - the same shape as the 1.53
+   videooptionsmenu() rows.  The item's MO_FUNCTION handler cycles the setting
+   and the label it shows is rebuilt from the new value on the next frame. */
+
+static char *aspectlabel(void)
+{
+  switch (config.keepaspect)
+  {
+  case 0:
+    return TXT_ASPECT_STRETCHED;
+  case 2:
+    return TXT_ASPECT_FULL;
+  }
+
+  return TXT_ASPECT_ORIGINAL;
+}
+
+/* Aspect Ratio cycles keepaspect 0 -> 1 -> 2 (Stretched, Original 4:3, Full).
+   setupviewport() recomputes the render and HUD areas, so the change is visible
+   without leaving the screen - main.c calls the same function at startup. */
+static void aspectratiochange(void)
+{
+  config.keepaspect++;
+
+  if (config.keepaspect > 2)
+    config.keepaspect = 0;
+
+  setupviewport();
+}
+
+/* Lighting and Shadows are copied into these two globals at boot (main.c), and
+   the renderer reads the globals rather than config.txt, so a toggle has to
+   update both.  Shadows keep their value while Lighting is Off - the row is
+   merely disabled (see the MO_HIGHLIGHT 0 in optionsmenu), so switching
+   Lighting back on restores the previous Shadows setting. */
+static void lightingchange(void)
+{
+  config.lighting ^= 1;
+  lighting_enabled = config.lighting;
+}
+
+static void shadowschange(void)
+{
+  config.shadows ^= 1;
+  shadow_enabled = config.shadows;
+}
+
+/* MSAA is baked into the EGL config before the window exists, so this only
+   changes what the next launch asks for - hence the hint under the row. */
+static void msaachange(void)
+{
+  config.msaa ^= 1;
+}
+
+static void interpolationchange(void)
+{
+  config.frameinterpolation ^= 1;
+}
+
+static void limiterchange(void)
+{
+  config.fpslimiter ^= 1;
+}
+
+static void warpzonepixelationchange(void)
+{
+  config.warpzonepixelation ^= 1;
+}
+
+/* game.turbomode is the live copy mainmenu() normally sets from config; set it
+   here too so the change takes effect without a trip through the main menu. */
+static void turbomodechange(void)
+{
+  config.turbomode ^= 1;
+  game.turbomode = config.turbomode;
+}
+
+/* Vita port: the Controls item cannot open the submenu directly - controlsmenu()
+   runs a loop of its own, and calling it from inside checkmenuitems() would nest
+   two input and draw passes in one frame.  Its handler only raises a flag;
+   optionsmenu() opens the screen after the frame has been presented. */
+static int requestcontrols = 0;
+
+static void controlsmenuopen(void)
+{
+  requestcontrols = 1;
+}
+
 void optionsmenu(void)
 {
   if (touchcontrols)
@@ -206,26 +275,16 @@ void optionsmenu(void)
   }
   else
   {
-    int count, count2, count3;
-    /* Was each item already waiting for a button before this frame's input?
-       The rebind handlers further down use this so the Start press that opens
-       a row is not also read as the button to bind. */
-    unsigned char rowactive[MAXMENUITEMS];
+    int prevjoynum;
 
-    count = 0;
-
-    /* Vita port: this screen is pad-navigable now.  It used to force
-       joystickmenu = 0 because it was mouse-only (no way in, no way out with a
-       pad) and because the old two-column layout had no sensible up/down order.
-       With the KEY column gone the items run in one visual column: Save, the
-       four rebindable player-1 rows, the four rebindable player-2 rows,
-       4 Player, the player-2 pad slot, then one line holding two groups: the
-       Sound row (toggle, "-", "+") at x = 0 and the Music row (toggle, "-",
-       "+") at x = 320.  All three items of each group always exist; a group
-       whose toggle is off is drawn dim and is skipped by the navigation, so
-       the item order (and therefore every index below) never changes.  Down/Up
-       move, Start activates - the same path every other menu uses.  Touch
-       still works, because the hit test in checkmenuitems() runs either way. */
+    /* Vita port: this screen is pad-navigable, and it is a hub now.  The top
+       row is Save + Controls, the Sound/Music pair follows, and the rest of the
+       page holds the port-only settings that used to be config.txt-only
+       (aspect ratio, lighting, shadows, MSAA, interpolation, limiter, Warp Zone
+       pixelation, turbo mode).  The keyboard/pad bindings moved to the Controls
+       screen.  Down/Up move, Start activates - the same path every other menu
+       uses.  Touch still works, because the hit test in checkmenuitems() runs
+       either way. */
     joystickmenu = 1;
 
     resetmenuitems();
@@ -243,93 +302,23 @@ void optionsmenu(void)
          hotkey letter because ESC has no letter to highlight. */
       createmenuitem(TXT_SAVE, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       setmenuitem(MO_HOTKEY, SCAN_ESC);
-      /* Vita port: only the four rebindable rows (Stick, Jump, Slide, Heavy -
-         buttons 4-7) get menu items here and at y=400 below.  The d-pad and
-         Start rows are fixed and drawn directly by drawfixedlabel(), so they
-         have no item, no hit box and no navigation stop. */
-      count = 208;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
 
-      count = 400;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-      createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      count += 16;
-
-      /* Vita port: the Video Options screen is not offered on this console, so
-         only TXT_4_PLAYER is created here and it lands at index 9 (Back plus
-         the four rebindable rows of each of the two players come first) - which
-         is what the handler at the bottom of this loop expects.
-         The video screen switched the colour depth at runtime (16 bit) and had
-         an Apply button; on the Vita that can leave the GLES surface in a state
-         the game cannot recover from, and there is no video mode to choose. */
-      createmenuitem(TXT_4_PLAYER, 160, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_HOTKEY, SCAN_4);
-
-      /* Vita port: player 1 is always the built-in controller, so its pad slot
-         is display-only.  It used to be a cycling MO_SET item, which let a
-         stray tap (or a future pad-navigation stop) set it to "None" and leave
-         the console with no pad at all - unfixable without touch.  The label
-         is now drawn directly (see the draw section below), so there is no
-         menu item, no hit box, and nothing to land on.  Player 2's slot stays
-         a real item: assigning a second pad there is how Versus starts. */
-      count = 304;
-
-      if (control[1].joysticknum == -1)
-      {
-        createmenuitem(TXT_NONE, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[1].joysticknum, 0);
-      }
-      if (control[1].joysticknum == 0)
-      {
-        createmenuitem(TXT_JOY1, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[1].joysticknum, 1);
-      }
-      if (control[1].joysticknum == 1)
-      {
-        createmenuitem(TXT_JOY2, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[1].joysticknum, 2);
-      }
-      if (control[1].joysticknum == 2)
-      {
-        createmenuitem(TXT_JOY3, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[1].joysticknum, 3);
-      }
-      if (control[1].joysticknum == 3)
-      {
-        createmenuitem(TXT_JOY4, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-        setmenuitem(MO_SET, &control[1].joysticknum, -1);
-      }
+      /* Bindings and pad assignment live on their own screen now. */
+      createmenuitem(TXT_CONTROLS, 160, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, controlsmenuopen);
 
       /* Vita port: the "- N% +" volume rows (see adjustvolume()).  Both groups
          are laid out identically and exactly 320 apart: the toggle at x, "-"
          at x + 160, the readout centred at x + 216 and "+" at x + 256.  Sound
          is the left column (x = 0) and Music the right one (x = 320) on the
-         same line, so the two read as a pair; Music used to sit on a line of
-         its own at y = 48.  The gaps work out at 8 px either side of a
-         four-glyph "100%" and 16 px around a three-glyph "50%", i.e. the row
-         reads as one control rather than three spread-out labels.  To widen it
-         again, move the readout centre and "+" right together.
+         same line, so the two read as a pair.
 
          All three items of a group are created every frame; only their state
          changes.  A group whose toggle is off stays on screen as a dimmed,
-         unusable row (the user's choice - the earlier build removed it, which
-         also moved every later item's index around), so the item order below
-         is fixed: Sound 11, sound "-" 12, sound "+" 13, Music 14, music "-"
-         15, music "+" 16.  Disabling is MO_HIGHLIGHT 0: checkmenuitems() then
-         skips the item entirely (no hit test, no hotkey, no activation) and
-         drawmenuitems() draws it at 25% brightness instead of the usual 50%. */
+         unusable row, so the item order is fixed.  Disabling is MO_HIGHLIGHT
+         0: checkmenuitems() then skips the item entirely (no hit test, no
+         hotkey, no activation) and drawmenuitems() draws it at 25% brightness
+         instead of the usual 50%. */
       if (option.sound)
       {
         createmenuitem(TXT_SOUND_ON, 0, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -362,14 +351,10 @@ void optionsmenu(void)
         createmenuitem(TXT_MUSIC_OFF, 320, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
         setmenuitem(MO_SET, &option.music, 1);
       }
-      /* The Music toggle is disabled only by Sound Off (master mute - see the
-         knowledge file), never by Music being off: that toggle is the way back
-         on.  The Music group is disabled by either - Music off means there is
-         nothing to adjust, Sound off means Music does nothing at all.  Both
-         cases share one condition, so they look identical (the same 25%) and
-         cannot stack into something dimmer or leave a button live that the
-         other case would grey: with Music already off, turning Sound off
-         changes nothing about this row. */
+      /* The Music toggle is disabled only by Sound Off (master mute), never by
+         Music being off: that toggle is the way back on.  The Music group is
+         disabled by either - Music off means there is nothing to adjust, Sound
+         off means Music does nothing at all. */
       if (!option.sound)
         setmenuitem(MO_HIGHLIGHT, 0);
       createmenuitem("-", 480, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -381,149 +366,90 @@ void optionsmenu(void)
       if (!option.music || !option.sound)
         setmenuitem(MO_HIGHLIGHT, 0);
 
+      /* The port options.  The mockup's vertical rhythm uses 16 units for a menu
+         row and 13 for a hint row, and every run of hint lines is followed by
+         an empty row of the same size, so the hint blocks are not flush against
+         the next label.  That is why the y values below are neither multiples
+         of 16 nor evenly spaced. */
+      createmenuitem(aspectlabel(), 320, 80, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, aspectratiochange);
+
+      createmenuitem(config.lighting ? TXT_ON : TXT_OFF, 160, 148, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, lightingchange);
+
+      /* Shadows keep their value while Lighting is off, but cannot be changed:
+         MO_HIGHLIGHT 0 makes checkmenuitems() skip the item and
+         drawmenuitems() draws it at 25%, matching the dimmed label below. */
+      createmenuitem(config.shadows ? TXT_ON : TXT_OFF, 480, 148, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, shadowschange);
+      if (!config.lighting)
+        setmenuitem(MO_HIGHLIGHT, 0);
+
+      createmenuitem(config.msaa ? TXT_ON : TXT_OFF, 320, 190, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, msaachange);
+
+      createmenuitem(config.frameinterpolation ? TXT_ON : TXT_OFF, 320, 232, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, interpolationchange);
+
+      createmenuitem(config.fpslimiter ? TXT_ON : TXT_OFF, 320, 248, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, limiterchange);
+
+      createmenuitem(config.warpzonepixelation ? TXT_ON : TXT_OFF, 320, 329, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, warpzonepixelationchange);
+
+      createmenuitem(config.turbomode ? TXT_ON : TXT_OFF, 320, 403, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_FUNCTION, turbomodechange);
+
       checksystemmessages();
-
-      /* Snapshot which rows were already waiting for a button.  checkmenuitems()
-         arms the selected row on this very Start press, and the handler after
-         the frame would otherwise see the same press as the new binding: Start
-         on "Move Left" would bind Start and close the row again, which looks
-         exactly like nothing happened.  One frame later the press edge is gone,
-         and a second, separate press binds normally - including Start. */
-      for (count = 0; count < numofmenuitems; count++)
-        rowactive[count] = (unsigned char)menuitem[count].active;
-
-      /* Vita port: while any row is waiting for a button, switch pad
-         navigation off for this frame.  Otherwise a row could be armed, the
-         d-pad could move to a second row and Start could arm that one too:
-         two rows would sit active, and the next bindable press would bind one
-         of them while the duplicate rule left the other empty.  With
-         joystickmenu at 0 checkmenuitems() skips both the d-pad movement and
-         the Start activation, so no second row can be armed.  Only navigation
-         is gated: the mouse hit test, the hotkeys and Select (read straight
-         from joystick[] below) all keep working, which is how a row is
-         cancelled or resolved.  Re-armed every frame from the snapshot, so it
-         turns itself back on the moment the last row is resolved. */
-      joystickmenu = 1;
-      for (count = 0; count < numofmenuitems; count++)
-        if (rowactive[count])
-          joystickmenu = 0;
-
       checkkeyboard();
       checkmouse();
       checkjoystick();
       checkmenuitems();
 
-      if (control[0].joysticknum >= numofjoysticks)
-        control[0].joysticknum = -1;
-      if (control[1].joysticknum >= numofjoysticks)
-        control[1].joysticknum = -1;
-
       setuptextdisplay();
 
-      drawtext(TXT_PLAYER, 0, 80, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      drawtext(TXT_JOYSTICK, 320, 80, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      /* Row labels and hints.  The labels are not items, so they are drawn at
+         the same 75% the bind-row names use; the hints use the 50% grey of the
+         pad name on the Controls screen. */
+      drawtext(TXT_ASPECT, 0, 80, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawtext(TXT_HINT_ASPECT1, 0, 96, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_HINT_ASPECT2, 0, 109, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_HINT_ASPECT3, 0, 122, 10, 0.5f, 0.5f, 0.5f, 1.0f);
 
-      drawtext(TXT_PLAYER1, 0, 112, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      /* Player 1's pad slot: display-only, drawn where the old item sat and in
-         the same 50% grey an unhighlighted menuitem used. */
-      drawtext(joynumlabel(control[0].joysticknum), 320, 112, 16, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_LIGHTING, 0, 148, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      if (config.lighting)
+        drawtext(TXT_SHADOWS, 320, 148, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      else
+        drawtext(TXT_SHADOWS, 320, 148, 16, 0.25f, 0.25f, 0.25f, 1.0f);
+      drawtext(TXT_HINT_LIGHTING, 0, 164, 10, 0.5f, 0.5f, 0.5f, 1.0f);
 
-      count2 = 0;
-      count  = 0;
-      drawtext(TXT_MOVE_LEFT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-      count++;
+      drawtext(TXT_ANTIALIASING, 0, 190, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawtext(TXT_HINT_MSAA, 0, 206, 10, 0.5f, 0.5f, 0.5f, 1.0f);
 
-      drawtext(TXT_MOVE_RIGHT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-      count++;
+      drawtext(TXT_FRAMEINTERPOLATION, 0, 232, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawtext(TXT_FPSLIMITER, 0, 248, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawtext(TXT_HINT_INTERPOLATION1, 0, 264, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_HINT_INTERPOLATION2, 0, 277, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_HINT_LIMITER1, 0, 290, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_HINT_LIMITER2, 0, 303, 10, 0.5f, 0.5f, 0.5f, 1.0f);
 
-      drawtext(TXT_MOVE_DOWN, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-      count++;
+      drawtext(TXT_WARPZONE_PIXELATION, 0, 329, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawtext(TXT_HINT_WARP1, 0, 345, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_HINT_WARP2, 0, 358, 10, 0.5f, 0.5f, 0.5f, 1.0f);
 
-      drawtext(TXT_MOVE_UP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-      count++;
-
-      drawtext(TXT_STICK, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_JUMP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_SLIDE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_HEAVY, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_START_PAUSE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_PLAYER2, 0, 304, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-
-      count2 = 1;
-      count  = 0;
-      drawtext(TXT_MOVE_LEFT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-      count++;
-
-      drawtext(TXT_MOVE_RIGHT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-      count++;
-
-      drawtext(TXT_MOVE_DOWN, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-      count++;
-
-      drawtext(TXT_MOVE_UP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-      count++;
-
-      drawtext(TXT_STICK, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_JUMP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_SLIDE, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-      count++;
-
-      drawtext(TXT_HEAVY, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-      drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-      count++;
-
-      if (control[0].joysticknum != -1)
-        drawtext(joystick[control[0].joysticknum].name, 320, 128, 10, 0.5f, 0.5f, 0.5f, 1.0f);
-      if (control[1].joysticknum != -1)
-        drawtext(joystick[control[1].joysticknum].name, 320, 320, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_TURBO_EDITION, 0, 403, 16, 0.75f, 0.75f, 0.75f, 1.0f);
+      drawtext(TXT_HINT_TURBO1, 0, 419, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+      drawtext(TXT_HINT_TURBO2, 0, 432, 10, 0.5f, 0.5f, 0.5f, 1.0f);
 
       /* Vita port: the percent readouts of the two volume rows.  Drawn here,
          not as menu items, so the number cannot be selected or clicked - only
-         the "-" and "+" either side of it can.  They are drawn unconditionally
-         now, because the groups themselves are always on screen; brightness
-         mirrors drawmenuitems()'s dimming - 1.0 for a usable row, 0.25 for a
-         disabled one - under exactly the same conditions the items use, so the
-         number can never be brighter or dimmer than its buttons. */
+         the "-" and "+" either side of it can.  Brightness mirrors
+         drawmenuitems()'s dimming - 1.0 for a usable row, 0.25 for a disabled
+         one - under exactly the same conditions the items use. */
       drawvolume(option.soundvolume, 0, 32, option.sound ? 1.0f : 0.25f);
       drawvolume(option.musicvolume, 320, 32, (option.music && option.sound) ? 1.0f : 0.25f);
 
       drawmenuitems();
-
-      /* Vita port: the drag-only volume bars are replaced by the "- N% +" rows
-         above, so drawsliderbars() is not called any more.  It is still
-         compiled (options.h declares it); restore this call to bring the bars
-         back. */
-      /* drawsliderbars(); */
 
       drawmousecursor(768 + font.cursornum, mouse.x, mouse.y, 16, 1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -533,101 +459,18 @@ void optionsmenu(void)
       SDL_GL_SwapWindow(globalwindow);
 #endif
 
-      /* Select cancels an armed rebind row, exactly like a left click clears
-         every item in checkmenuitems().  It runs before the rebind handlers, so
-         the press that cancels is never written into a row, and outside the
-         per-player blocks, so it also works for a player whose pad is not
-         assigned yet (that handler is skipped entirely).  This exists only on
-         the Options screen - Select is an ordinary button everywhere else. */
-      if (control[0].joysticknum != -1)
-        if (joystick[control[0].joysticknum].numofbuttons > 10)
-          if (joystick[control[0].joysticknum].button[10]
-              && !prevjoystick[control[0].joysticknum].button[10])
-            for (count = 0; count < numofmenuitems; count++)
-              menuitem[count].active = 0;
+      /* Opened after the frame is presented, so the press that activated the
+         Controls item is already an edge in the past and cannot be read as
+         input by the new screen.  The hub's selection is restored afterwards
+         so Back lands on Controls, not on Save. */
+      if (requestcontrols)
+      {
+        requestcontrols = 0;
 
-        /* Vita port: only buttons 4-7 (Stick, Jump, Slide, Heavy) are
-           rebindable - the d-pad rows and Start are fixed and drawn by
-           drawfixedlabel(), so they have no item to arm.  count stays the
-           button index, which is why the item index is offset by three. */
-        for (count = 4; count < 8; count++)
-          if (menuitem[count - 3].active && rowactive[count - 3])
-          {
-            for (count2 = 0; count2 < joystick[control[0].joysticknum].numofbuttons; count2++)
-              if (!reservedbutton(count2)
-                  && joystick[control[0].joysticknum].button[count2]
-                  && !prevjoystick[control[0].joysticknum].button[count2])
-              {
-                control[0].button[count] = count2;
-
-                if (control[0].joysticknum != -1)
-                  for (count3 = 0; count3 < joystick[control[0].joysticknum].numofbuttons; count3++)
-                    if (count3 != count)
-                      if (control[0].button[count3] == count2)
-                        control[0].button[count3] = -1;
-                /*
-                if (control[1].joysticknum!=-1)
-                for (count3=0;count3<joystick[control[1].joysticknum].numofbuttons;count3++)
-                if (count3!=count)
-                if (control[1].button[count3]==count2)
-                  control[1].button[count3]=-1;
-                */
-                menuitem[count - 3].active = 0;
-              }
-            if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
-            {
-              control[0].button[count]    = -1;
-              menuitem[count - 3].active = 0;
-            }
-          }
-      if (control[1].joysticknum != -1)
-        for (count = 4; count < 8; count++)
-          if (menuitem[count + 1].active && rowactive[count + 1])
-          {
-            for (count2 = 0; count2 < joystick[control[1].joysticknum].numofbuttons; count2++)
-              if (!reservedbutton(count2)
-                  && joystick[control[1].joysticknum].button[count2]
-                  && !prevjoystick[control[1].joysticknum].button[count2])
-              {
-                control[1].button[count] = count2;
-                /*
-                if (control[0].joysticknum!=-1)
-                for (count3=0;count3<8;count3++)
-                if (count3!=count)
-                if (control[0].button[count3]==count2)
-                  control[0].button[count3]=-1;
-                */
-                if (control[1].joysticknum != -1)
-                  for (count3 = 0; count3 < 8; count3++)
-                    if (count3 != count)
-                      if (control[1].button[count3] == count2)
-                        control[1].button[count3] = -1;
-
-                menuitem[count + 1].active = 0;
-              }
-            if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
-            {
-              control[1].button[count]    = -1;
-              menuitem[count + 1].active = 0;
-            }
-          }
-      if (menuitem[9].active)
-        optionsmenu2();
-
-      /* Vita port: the old drag-only volume bars used to be read here.  They
-         are replaced by the "- N% +" rows, whose buttons go through
-         checkmenuitems() like every other item.  Kept, commented, in case the
-         bars come back.
-
-      if (mouse.lmb)
-        if (mouse.x >= 160 && mouse.x < 288)
-        {
-          if (mouse.y >= 32 && mouse.y < 48)
-            option.soundvolume = (float)(mouse.x - 160) / 128.0f;
-          if (mouse.y >= 48 && mouse.y < 64)
-            option.musicvolume = (float)(mouse.x - 160) / 128.0f;
-        }
-      */
+        prevjoynum = joymenunum;
+        controlsmenu();
+        joymenunum = prevjoynum;
+      }
     }
 
     resetmenuitems();
@@ -639,11 +482,12 @@ void optionsmenu(void)
        the one after mainmenu() returns, i.e. after the Exit item - and the
        Vita has no Exit item worth trusting: closing the application from the
        LiveArea kills the process without reaching that code, so every volume
-       change, pad assignment and rebind made here was silently lost.  The file
-       is small and saveconfig() rewrites it from memory, so a write per Back
-       is cheap.  This is also reached when windowinfo.shutdown ends the loop.
-       The 4 Player screen needs nothing of its own: it returns here, and the
-       Back that leaves this screen saves players 3 and 4 as well. */
+       change, pad assignment, rebind and option change made here was silently
+       lost.  The file is small and saveconfig() rewrites it from memory, so a
+       write per Save is cheap.  This is also reached when windowinfo.shutdown
+       ends the loop.  The Controls screen needs nothing of its own: it returns
+       here, and the Save that leaves this screen writes its assignments and
+       bindings as well. */
     saveconfig();
   }
 }
@@ -815,243 +659,33 @@ void videooptionsmenu(void)
    adjustvolume() in this file).  Nothing calls this any more - the call site
    in optionsmenu() is commented out.  Kept because it is the only remaining
    description of the original bar geometry, and it costs nothing to build. */
-void drawsliderbars(void)
-{
-  float vec[3];
+/* Vita port: the Controls screen.  All four players are on one page - the old
+   separate 4 Player screen is gone, because a second screen for the same job
+   was more confusing than four blocks on one page.  Per player: the pad slot,
+   the pad's product name (size 10), and the four rebindable bindings (Stick,
+   Jump, Slide, Heavy).  The d-pad and Start rows are not shown at all: they are
+   fixed by the port and cannot be rebound, and a row nobody can use is worse
+   than an absent one.
 
-  glDisable(GL_TEXTURE_2D);
+   Player 1's slot is display-only (the built-in controller); players 2-4 cycle
+   None/Joy1..Joy4.  A player without a pad has its bind rows disabled (menu
+   items with highlight 0), so they cannot be armed and left showing "?" with no
+   way to bind anything.
 
-#if defined(GLES)
-  GLfloat quad[12];
-  glEnableClientState(GL_VERTEX_ARRAY);
-#else
-  glBegin(GL_QUADS);
-#endif
-  if (option.sound)
-  {
-    glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
+   Layout: header at y=32, then four blocks 106 units apart starting at y=61.
+   Inside a block the player line is at +0, the pad name at +16, and the four
+   bind rows at +29/+45/+61/+77.  The last row ends at y=472, eight units above
+   the bottom edge. */
 
-    vec[0] = 160.0f;
-    vec[1] = 40.0f - 1.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[0] = vec[0];
-    quad[1] = vec[1];
-    quad[2] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + 128.0f;
-    vec[1] = 40.0f - 5.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[3] = vec[0];
-    quad[4] = vec[1];
-    quad[5] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + 128.0f;
-    vec[1] = 40.0f + 5.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[6] = vec[0];
-    quad[7] = vec[1];
-    quad[8] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f;
-    vec[1] = 40.0f + 1.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[9] = vec[0];
-    quad[10] = vec[1];
-    quad[11] = vec[2];
-
-    glVertexPointer(3, GL_FLOAT, 0, quad);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glDisableClientState(GL_VERTEX_ARRAY);
-#else
-    glVertex3fv(vec);
-#endif
-
-    glColor4f(0.75f, 0.75f, 0.75f, 1.0f);
-
-    vec[0] = 160.0f + option.soundvolume * 128.0f - 2.0f;
-    vec[1] = 40.0f - 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    glEnableClientState(GL_VERTEX_ARRAY);
-
-    quad[0] = vec[0];
-    quad[1] = vec[1];
-    quad[2] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + option.soundvolume * 128.0f + 2.0f;
-    vec[1] = 40.0f - 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[3] = vec[0];
-    quad[4] = vec[1];
-    quad[5] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + option.soundvolume * 128.0f + 2.0f;
-    vec[1] = 40.0f + 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[6] = vec[0];
-    quad[7] = vec[1];
-    quad[8] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + option.soundvolume * 128.0f - 2.0f;
-    vec[1] = 40.0f + 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[9] = vec[0];
-    quad[10] = vec[1];
-    quad[11] = vec[2];
-
-    glVertexPointer(3, GL_FLOAT, 0, quad);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glDisableClientState(GL_VERTEX_ARRAY);
-#else
-    glVertex3fv(vec);
-#endif
-  }
-  if (option.music)
-  {
-    glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
-
-    vec[0] = 160.0f;
-    vec[1] = 56.0f - 1.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    glEnableClientState(GL_VERTEX_ARRAY);
-
-    quad[0] = vec[0];
-    quad[1] = vec[1];
-    quad[2] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + 128.0f;
-    vec[1] = 56.0f - 5.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[3] = vec[0];
-    quad[4] = vec[1];
-    quad[5] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + 128.0f;
-    vec[1] = 56.0f + 5.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[6] = vec[0];
-    quad[7] = vec[1];
-    quad[8] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f;
-    vec[1] = 56.0f + 1.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[9] = vec[0];
-    quad[10] = vec[1];
-    quad[11] = vec[2];
-
-    glVertexPointer(3, GL_FLOAT, 0, quad);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glDisableClientState(GL_VERTEX_ARRAY);
-#else
-    glVertex3fv(vec);
-#endif
-
-    glColor4f(0.75f, 0.75f, 0.75f, 1.0f);
-
-    vec[0] = 160.0f + option.musicvolume * 128.0f - 2.0f;
-    vec[1] = 56.0f - 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    glEnableClientState(GL_VERTEX_ARRAY);
-
-    quad[0] = vec[0];
-    quad[1] = vec[1];
-    quad[2] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + option.musicvolume * 128.0f + 2.0f;
-    vec[1] = 56.0f - 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[3] = vec[0];
-    quad[4] = vec[1];
-    quad[5] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-
-    vec[0] = 160.0f + option.musicvolume * 128.0f + 2.0f;
-    vec[1] = 56.0f + 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-#if defined(GLES)
-    quad[6] = vec[0];
-    quad[7] = vec[1];
-    quad[8] = vec[2];
-#else
-    glVertex3fv(vec);
-#endif
-    vec[0] = 160.0f + option.musicvolume * 128.0f - 2.0f;
-    vec[1] = 56.0f + 7.0f;
-    convertscreenvertex(vec, font.sizex, font.sizey);
-
-#if defined(GLES)
-    quad[9] = vec[0];
-    quad[10] = vec[1];
-    quad[11] = vec[2];
-
-    glVertexPointer(3, GL_FLOAT, 0, quad);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glDisableClientState(GL_VERTEX_ARRAY);
-#else
-    glVertex3fv(vec);
-#endif
-  }
-
-#if !defined(GLES)
-  glEnd();
-#endif
-  glEnable(GL_TEXTURE_2D);
-}
-
-void optionsmenu2(void)
+void controlsmenu(void)
 {
   int count, count2, count3;
-  /* Same activation-press guard as optionsmenu(): was each item already
-     waiting for a button before this frame's input? */
+  int player, row, item;
+  int block, nextslot;
+  float brightness;
   unsigned char rowactive[MAXMENUITEMS];
-
-  count = 0;
+  char *playerlabel[4] = {TXT_PLAYER1, TXT_PLAYER2, TXT_PLAYER3, TXT_PLAYER4};
+  char *bindlabel[4]   = {TXT_STICK, TXT_JUMP, TXT_SLIDE, TXT_HEAVY};
 
   resetmenuitems();
 
@@ -1063,89 +697,57 @@ void optionsmenu2(void)
     numofmenuitems = 0;
     createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
     setmenuitem(MO_HOTKEY, SCAN_ESC);
-    /* Vita port: only the four rebindable rows of each player (buttons 4-7)
-       get menu items - the d-pad rows are fixed and drawn by drawfixedlabel(). */
-    count = 208;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
 
-    count = 400;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
-    createmenuitem("        ", 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    count += 16;
+    /* Item order, and therefore every index below: Back 0, then per player the
+       slot (players 2-4 only) followed by the four bind rows - so a player's
+       first bind row is at 1 + player * 5. */
+    for (player = 0; player < 4; player++)
+    {
+      block = 61 + player * 106;
 
-    count = 112;
-    if (control[2].joysticknum == -1)
-    {
-      createmenuitem(TXT_NONE, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[2].joysticknum, 0);
-    }
-    if (control[2].joysticknum == 0)
-    {
-      createmenuitem(TXT_JOY1, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[2].joysticknum, 1);
-    }
-    if (control[2].joysticknum == 1)
-    {
-      createmenuitem(TXT_JOY2, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[2].joysticknum, 2);
-    }
-    if (control[2].joysticknum == 2)
-    {
-      createmenuitem(TXT_JOY3, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[2].joysticknum, 3);
-    }
-    if (control[2].joysticknum == 3)
-    {
-      createmenuitem(TXT_JOY4, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[2].joysticknum, -1);
-    }
-    count = 304;
-    if (control[3].joysticknum == -1)
-    {
-      createmenuitem(TXT_NONE, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[3].joysticknum, 0);
-    }
-    if (control[3].joysticknum == 0)
-    {
-      createmenuitem(TXT_JOY1, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[3].joysticknum, 1);
-    }
-    if (control[3].joysticknum == 1)
-    {
-      createmenuitem(TXT_JOY2, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[3].joysticknum, 2);
-    }
-    if (control[3].joysticknum == 2)
-    {
-      createmenuitem(TXT_JOY3, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[3].joysticknum, 3);
-    }
-    if (control[3].joysticknum == 3)
-    {
-      createmenuitem(TXT_JOY4, 320, count, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-      setmenuitem(MO_SET, &control[3].joysticknum, -1);
+      /* A stored slot that does not name a pad we know of is reset to None, so
+         the label and the cycle below always agree with the value. */
+      if (control[player].joysticknum < -1 || control[player].joysticknum > 3)
+        control[player].joysticknum = -1;
+
+      if (player > 0)
+      {
+        nextslot = control[player].joysticknum + 1;
+        if (nextslot > 3)
+          nextslot = -1;
+
+        createmenuitem(joynumlabel(control[player].joysticknum), 320, block, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        setmenuitem(MO_SET, &control[player].joysticknum, nextslot);
+      }
+
+      for (row = 0; row < 4; row++)
+      {
+        createmenuitem("        ", 320, block + 29 + row * 16, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+        if (control[player].joysticknum == -1)
+          setmenuitem(MO_HIGHLIGHT, 0);
+      }
     }
 
     checksystemmessages();
 
-    /* See optionsmenu(): remember which rows were already armed, so the Start
-       press that arms one is not mistaken for the binding itself. */
+    /* Snapshot which rows were already waiting for a button.  checkmenuitems()
+       arms the selected row on this very Start press, and the handler after the
+       frame would otherwise see the same press as the new binding: Start on
+       "Stick" would bind Start and close the row again, which looks exactly
+       like nothing happened.  One frame later the press edge is gone, and a
+       second, separate press binds normally - including Start. */
     for (count = 0; count < numofmenuitems; count++)
       rowactive[count] = (unsigned char)menuitem[count].active;
 
-    /* See optionsmenu(): no pad navigation while a row waits for a button. */
+    /* While any row is waiting for a button, switch pad navigation off for this
+       frame.  Otherwise a row could be armed, the d-pad could move to a second
+       row and Start could arm that one too: two rows would sit active, and the
+       next bindable press would bind one of them while the duplicate rule left
+       the other empty.  Only navigation is gated: the mouse hit test, the
+       hotkeys and Select (read straight from joystick[] below) keep working,
+       which is how a row is cancelled or resolved.  Re-armed every frame from
+       the snapshot, so it turns itself back on the moment the last row is
+       resolved. */
     joystickmenu = 1;
     for (count = 0; count < numofmenuitems; count++)
       if (rowactive[count])
@@ -1156,105 +758,42 @@ void optionsmenu2(void)
     checkjoystick();
     checkmenuitems();
 
-    if (control[2].joysticknum >= numofjoysticks)
-      control[2].joysticknum = -1;
-    if (control[3].joysticknum >= numofjoysticks)
-      control[3].joysticknum = -1;
+    for (player = 0; player < 4; player++)
+      if (control[player].joysticknum >= numofjoysticks)
+        control[player].joysticknum = -1;
 
     setuptextdisplay();
 
-    drawtext(TXT_PLAYER, 0, 80, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    drawtext(TXT_JOYSTICK, 320, 80, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawtext(TXT_PLAYER, 0, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    drawtext(TXT_CONTROLLER, 320, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
 
-    drawtext(TXT_PLAYER3, 0, 112, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+    for (player = 0; player < 4; player++)
+    {
+      block = 61 + player * 106;
 
-    count2 = 2;
-    count  = 0;
-    drawtext(TXT_MOVE_LEFT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-    count++;
+      drawtext(playerlabel[player], 0, block, 16, 1.0f, 1.0f, 1.0f, 1.0f);
 
-    drawtext(TXT_MOVE_RIGHT, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-    count++;
+      /* Player 1's slot stays display-only and is drawn here (see joynumlabel):
+         it used to be a cycling item, which let a stray tap set it to "None"
+         and leave the console with no pad at all.  Players 2-4 draw their slot
+         through drawmenuitems() as a normal value item. */
+      if (player == 0)
+        drawtext(joynumlabel(control[player].joysticknum), 320, block, 16, 0.5f, 0.5f, 0.5f, 1.0f);
 
-    drawtext(TXT_MOVE_DOWN, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-    count++;
-
-    drawtext(TXT_MOVE_UP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 144 + count * 16, 16, TXT_AXIS);
-    count++;
-
-    drawtext(TXT_STICK, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-    count++;
-
-    drawtext(TXT_JUMP, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-    count++;
-
-    drawtext(TXT_SLIDE, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-    count++;
-
-    drawtext(TXT_HEAVY, 0, 144 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count - 3, 320, 144 + count * 16, 16, TXT_NONE);
-    count++;
-    /*
-    drawtext("Start//Pause",0,144+count*16,16,0.75f,0.75f,0.75f,1.0f);
-    if (!menuitem[count + 1].active)
-      {
-      if (control[count2].button[count]!=-1)
-        drawtext(TXT_BUTTON" /i",320,144+count*16,16,1.0f,1.0f,1.0f,1.0f,control[count2].button[count]+1);
+      if (control[player].joysticknum != -1)
+        drawtext(joystick[control[player].joysticknum].name, 320, block + 16, 10, 0.5f, 0.5f, 0.5f, 1.0f);
       else
-        drawtext(TXT_NONE,320,144+count*16,16,1.0f,1.0f,1.0f,1.0f);
+        drawtext(TXT_NO_CONTROLLER, 320, block + 16, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+
+      brightness = control[player].joysticknum == -1 ? 0.25f : 0.75f;
+
+      for (row = 0; row < 4; row++)
+      {
+        drawtext(bindlabel[row], 0, block + 29 + row * 16, 16, brightness, brightness, brightness, 1.0f);
+        drawbindlabel(control[player].button[4 + row], 1 + player * 5 + row,
+                      320, block + 29 + row * 16, 16, TXT_NONE);
       }
-    else
-      drawtext("?",320,144+count*16,16,1.0f,1.0f,1.0f,1.0f);
-    count++;
-    */
-
-    drawtext(TXT_PLAYER4, 0, 304, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-
-    count2 = 3;
-    count  = 0;
-    drawtext(TXT_MOVE_LEFT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-    count++;
-
-    drawtext(TXT_MOVE_RIGHT, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-    count++;
-
-    drawtext(TXT_MOVE_DOWN, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-    count++;
-
-    drawtext(TXT_MOVE_UP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawfixedlabel(control[count2].button[count], 320, 336 + count * 16, 16, TXT_AXIS);
-    count++;
-
-    drawtext(TXT_STICK, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-    count++;
-
-    drawtext(TXT_JUMP, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-    count++;
-
-    drawtext(TXT_SLIDE, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-    count++;
-
-    drawtext(TXT_HEAVY, 0, 336 + count * 16, 16, 0.75f, 0.75f, 0.75f, 1.0f);
-    drawbindlabel(control[count2].button[count], count + 1, 320, 336 + count * 16, 16, TXT_NONE);
-    count++;
-
-    if (control[2].joysticknum != -1)
-      drawtext(joystick[control[2].joysticknum].name, 320, 128, 10, 0.5f, 0.5f, 0.5f, 1.0f);
-    if (control[3].joysticknum != -1)
-      drawtext(joystick[control[3].joysticknum].name, 320, 320, 10, 0.5f, 0.5f, 0.5f, 1.0f);
+    }
 
     drawmenuitems();
 
@@ -1266,7 +805,12 @@ void optionsmenu2(void)
     SDL_GL_SwapWindow(globalwindow);
 #endif
 
-    /* See optionsmenu(): Select cancels any armed rebind row. */
+    /* Select cancels an armed rebind row, exactly like a left click clears
+       every item in checkmenuitems().  It runs before the rebind handlers, so
+       the press that cancels is never written into a row, and outside the
+       per-player blocks, so it also works for a player whose pad is not
+       assigned yet (that handler is skipped entirely).  This exists only on the
+       Options screens - Select is an ordinary button everywhere else. */
     if (control[0].joysticknum != -1)
       if (joystick[control[0].joysticknum].numofbuttons > 10)
         if (joystick[control[0].joysticknum].button[10]
@@ -1274,55 +818,51 @@ void optionsmenu2(void)
           for (count = 0; count < numofmenuitems; count++)
             menuitem[count].active = 0;
 
-      for (count = 4; count < 8; count++)
-        if (menuitem[count - 3].active && rowactive[count - 3])
-        {
-          for (count2 = 0; count2 < joystick[control[2].joysticknum].numofbuttons; count2++)
-            if (!reservedbutton(count2) && joystick[control[2].joysticknum].button[count2] && !prevjoystick[control[2].joysticknum].button[count2])
-            {
-              control[2].button[count] = count2;
+    /* One rebind scan per player.  Only buttons 4-7 (Stick, Jump, Slide, Heavy)
+       are rebindable - the d-pad rows and Start are fixed and not shown - so
+       count stays the row offset within those four. */
+    for (player = 0; player < 4; player++)
+    {
+      if (control[player].joysticknum == -1)
+        continue;
 
-              if (control[2].joysticknum != -1)
-                for (count3 = 0; count3 < joystick[control[2].joysticknum].numofbuttons; count3++)
-                  if (count3 != count)
-                    if (control[2].button[count3] == count2)
-                      control[2].button[count3] = -1;
+      for (row = 0; row < 4; row++)
+      {
+        item = 1 + player * 5 + row;
 
-              menuitem[count - 3].active = 0;
-            }
-          if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
+        if (!menuitem[item].active || !rowactive[item])
+          continue;
+
+        for (count2 = 0; count2 < joystick[control[player].joysticknum].numofbuttons; count2++)
+          if (!reservedbutton(count2)
+              && joystick[control[player].joysticknum].button[count2]
+              && !prevjoystick[control[player].joysticknum].button[count2])
           {
-            control[2].button[count]    = -1;
-            menuitem[count - 3].active = 0;
+            control[player].button[4 + row] = count2;
+
+            /* One button, one action: clear it from this player's other three
+               rebindable rows.  The hidden d-pad and Start rows can never
+               collide with a bindable button - they hold 6-9 and 11, all of
+               which reservedbutton() refuses - so they are left alone. */
+            for (count3 = 4; count3 < 8; count3++)
+              if (count3 != 4 + row)
+                if (control[player].button[count3] == count2)
+                  control[player].button[count3] = -1;
+
+            menuitem[item].active = 0;
           }
-        }
-    if (control[3].joysticknum != -1)
-      for (count = 4; count < 8; count++)
-        if (menuitem[count + 1].active && rowactive[count + 1])
+
+        if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
         {
-          for (count2 = 0; count2 < joystick[control[3].joysticknum].numofbuttons; count2++)
-            if (!reservedbutton(count2) && joystick[control[3].joysticknum].button[count2] && !prevjoystick[control[3].joysticknum].button[count2])
-            {
-              control[3].button[count] = count2;
-
-              if (control[3].joysticknum != -1)
-                for (count3 = 0; count3 < 8; count3++)
-                  if (count3 != count)
-                    if (control[3].button[count3] == count2)
-                      control[3].button[count3] = -1;
-
-              menuitem[count + 1].active = 0;
-            }
-          if (keyboard[SCAN_DELETE] && !prevkeyboard[SCAN_DELETE])
-          {
-            control[3].button[count]    = -1;
-            menuitem[count + 1].active = 0;
-          }
+          control[player].button[4 + row] = -1;
+          menuitem[item].active = 0;
         }
+      }
+    }
   }
 
-  /* Never leave the parent screen with navigation switched off: on the last
-     frame of a cancelled 4 Player screen a row could still have been armed. */
+  /* Never leave the hub with navigation switched off: on the last frame of a
+     cancelled screen a row could still have been armed. */
   joystickmenu = 1;
 
   resetmenuitems();

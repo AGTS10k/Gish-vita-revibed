@@ -66,6 +66,50 @@ int renderareax, renderareay, renderareaw, renderareah;
 int hudareax, hudareay, hudareaw, hudareah;
 float hudfrustumscale = 1.0f;
 
+/* Work out where the 640x480 design space and the world render area sit inside
+   the framebuffer.  Called once at startup and again whenever the Aspect Ratio
+   option changes keepaspect, so a mode change applies immediately instead of on
+   the next launch. */
+void setupviewport(void)
+{
+  if (config.keepaspect == 1)
+  {
+    /* 4:3 render area: width 725 fits the 960x544 framebuffer (544*4/3), centered */
+    renderareaw = 725;
+    renderareah = windowinfo.resolutiony;
+    renderareax = (windowinfo.resolutionx - renderareaw) / 2;
+    renderareay = (windowinfo.resolutiony - renderareah) / 2;
+  }
+  else
+  {
+    /* 0 = stretched, 2 = expand: either way the world fills the framebuffer */
+    renderareax = 0;
+    renderareay = 0;
+    renderareaw = windowinfo.resolutionx;
+    renderareah = windowinfo.resolutiony;
+  }
+
+  if (config.keepaspect == 2)
+  {
+    /* Expand mode: the HUD viewport covers the whole screen, but the text
+       frustum is widened by hudfrustumscale, so the 640x480 design space keeps
+       its 4:3 physical size and is merely centred (117px margin each side). */
+    hudareax = 0;
+    hudareay = 0;
+    hudareaw = windowinfo.resolutionx;
+    hudareah = windowinfo.resolutiony;
+    hudfrustumscale = (float)windowinfo.resolutionx / 725.0f;
+  }
+  else
+  {
+    hudareax = renderareax;
+    hudareay = renderareay;
+    hudareaw = renderareaw;
+    hudareah = renderareah;
+    hudfrustumscale = 1.0f;
+  }
+}
+
 int main(int argc, char *argv[])
 {
   int count;
@@ -226,42 +270,7 @@ int main(int argc, char *argv[])
   font.sizex      = 640;
   font.sizey      = 480;
 
-  if (config.keepaspect == 1)
-  {
-    /* 4:3 render area: width 725 fits the 960x544 framebuffer (544*4/3), centered */
-    renderareaw = 725;
-    renderareah = windowinfo.resolutiony;
-    renderareax = (windowinfo.resolutionx - renderareaw) / 2;
-    renderareay = (windowinfo.resolutiony - renderareah) / 2;
-  }
-  else
-  {
-    /* 0 = stretched, 2 = expand: either way the world fills the framebuffer */
-    renderareax = 0;
-    renderareay = 0;
-    renderareaw = windowinfo.resolutionx;
-    renderareah = windowinfo.resolutiony;
-  }
-
-  if (config.keepaspect == 2)
-  {
-    /* Expand mode: the HUD viewport covers the whole screen, but the text
-       frustum is widened by hudfrustumscale, so the 640x480 design space keeps
-       its 4:3 physical size and is merely centred (117px margin each side). */
-    hudareax = 0;
-    hudareay = 0;
-    hudareaw = windowinfo.resolutionx;
-    hudareah = windowinfo.resolutiony;
-    hudfrustumscale = (float)windowinfo.resolutionx / 725.0f;
-  }
-  else
-  {
-    hudareax = renderareax;
-    hudareay = renderareay;
-    hudareaw = renderareaw;
-    hudareah = renderareah;
-    hudfrustumscale = 1.0f;
-  }
+  setupviewport();
 
   loadtexturetga_app(1000, "font00.tga", 0, GL_CLAMP, GL_CLAMP, GL_LINEAR, GL_LINEAR);
   loadtexturetga(1001, "font01.tga", 0, GL_CLAMP, GL_CLAMP, GL_LINEAR, GL_LINEAR);
