@@ -119,18 +119,35 @@ void checkmenuitems(void)
       count2 = 0;
       if (control[0].joysticknum != -1)
       {
+        /* Both axes step the list: the stick's Y and the d-pad's Up/Down walk
+           it one way, its X and the d-pad's Left/Right the other (Right and
+           Down advance, Left and Up go back).  A menu is a single column, so
+           nothing else competes for the horizontal axis and a pad user never
+           has to remember which axis a particular screen listens to. */
         if (joystick[control[0].joysticknum].axis[1] >= 0.5f && prevjoystick[control[0].joysticknum].axis[1] < 0.5f)
           count2 = -1;
         if (joystick[control[0].joysticknum].axis[1] <= -0.5f && prevjoystick[control[0].joysticknum].axis[1] > -0.5f)
           count2 = 1;
+        if (joystick[control[0].joysticknum].axis[0] >= 0.5f && prevjoystick[control[0].joysticknum].axis[0] < 0.5f)
+          count2 = 1;
+        if (joystick[control[0].joysticknum].axis[0] <= -0.5f && prevjoystick[control[0].joysticknum].axis[0] > -0.5f)
+          count2 = -1;
 
-        if (control[0].button[2] != -1)
-          if (joystick[control[0].joysticknum].button[control[0].button[2]]
-              && !prevjoystick[control[0].joysticknum].button[control[0].button[2]])
+        if (control[0].button[KEYALIAS_DOWN] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_DOWN]]
+              && !prevjoystick[control[0].joysticknum].button[control[0].button[KEYALIAS_DOWN]])
             count2 = 1;
-        if (control[0].button[3] != -1)
-          if (joystick[control[0].joysticknum].button[control[0].button[3]]
-              && !prevjoystick[control[0].joysticknum].button[control[0].button[3]])
+        if (control[0].button[KEYALIAS_UP] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_UP]]
+              && !prevjoystick[control[0].joysticknum].button[control[0].button[KEYALIAS_UP]])
+            count2 = -1;
+        if (control[0].button[KEYALIAS_RIGHT] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_RIGHT]]
+              && !prevjoystick[control[0].joysticknum].button[control[0].button[KEYALIAS_RIGHT]])
+            count2 = 1;
+        if (control[0].button[KEYALIAS_LEFT] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_LEFT]]
+              && !prevjoystick[control[0].joysticknum].button[control[0].button[KEYALIAS_LEFT]])
             count2 = -1;
       }
 
@@ -138,6 +155,16 @@ void checkmenuitems(void)
         count2 = -1;
       if (keyboard[control[0].key[KEYALIAS_DOWN]] && !prevkeyboard[control[0].key[KEYALIAS_DOWN]])
         count2 = 1;
+      /* Left and Right step the list exactly like Up and Down.  They keep
+         their old job of moving the caret while a text box is open, so they
+         are skipped whenever menuinputkeyboard marks one as active. */
+      if (!menuinputkeyboard)
+      {
+        if (keyboard[control[0].key[KEYALIAS_LEFT]] && !prevkeyboard[control[0].key[KEYALIAS_LEFT]])
+          count2 = -1;
+        if (keyboard[control[0].key[KEYALIAS_RIGHT]] && !prevkeyboard[control[0].key[KEYALIAS_RIGHT]])
+          count2 = 1;
+      }
 
       joymenunum += count2;
 
