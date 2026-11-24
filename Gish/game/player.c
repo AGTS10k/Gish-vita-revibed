@@ -59,12 +59,14 @@ void playermenu(void)
 {
   int count, count2, count3;
   int deleteplayer;
+  int nameentrystarted;
 
   resetmenuitems();
 
   joymenunum   = 1;
   playernum    = -1;
   deleteplayer = 0;
+  nameentrystarted = 0;
 
   while (!menuitem[0].active && !windowinfo.shutdown)
   {
@@ -72,6 +74,8 @@ void playermenu(void)
     glClear(GL_COLOR_BUFFER_BIT);
 
     numofmenuitems = 0;
+    if (playernum == -1)
+      nameentrystarted = 0;
     createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
     setmenuitem(MO_HOTKEY, SCAN_ESC);
 
@@ -119,11 +123,29 @@ void playermenu(void)
       }
     }
 
+    /* Vita: picking an empty slot drops straight into the arcade name entry.
+       Only once per visit, so that after Start accepts the name the d-pad can
+       move the selection on to Create. */
+    if (playernum != -1 && !deleteplayer && !nameentrystarted && player[playernum].name[0] == 0)
+    {
+      nameentrystarted = 1;
+      menuitem[1].active = 1;
+    }
+
     checksystemmessages();
     checkkeyboard();
     checkmouse();
     checkjoystick();
+    /* While the name field is open it reads the pad itself - Up and Down cycle
+       the letter under the caret, Left and Right move it - so the menu must
+       not walk the list at the same time. */
+    if (numofmenuitems > 1 && menuitem[1].active && menuitem[1].type == 1)
+    {
+      nameentrystarted = 1;
+      joystickmenu = 0;
+    }
     checkmenuitems();
+    joystickmenu = 1;
 
     updateogg();
     checkmusic();

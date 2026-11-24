@@ -342,6 +342,13 @@ void drawmenuitems(void)
                        (float)(menuitem[count].g * (menuitem[count].highlight + 1)) * 0.25f,
                        (float)(menuitem[count].b * (menuitem[count].highlight + 1)) * 0.25f, 0.5f);
 
+#ifdef __vita__
+          /* Name entry marks the caret cell with the two arrows instead; the
+             underscore would land on top of the selected glyph. */
+          if (menuitem[count].inputtype == 3)
+            ;
+          else
+#endif
           if (!menuinputinsert)
             drawtext("_", menuitem[count].x + xoffset + menuinputcursorpos * menuitem[count].textsize,
                      menuitem[count].y + yoffset, menuitem[count].textsize,
@@ -354,6 +361,39 @@ void drawmenuitems(void)
                      (float)(menuitem[count].r * (menuitem[count].highlight + 1)) * 0.25f,
                      (float)(menuitem[count].g * (menuitem[count].highlight + 1)) * 0.25f,
                      (float)(menuitem[count].b * (menuitem[count].highlight + 1)) * 0.25f, 0.5f);
+#ifdef __vita__
+          /* Name entry: the glyph under the caret is the one Up and Down cycle,
+             so draw it at full brightness and put the two d-pad arrows right
+             above and below it. */
+          if (menuitem[count].inputtype == 3)
+          {
+            int fontnum;
+
+            drawtext(menuinput, menuitem[count].x + xoffset, menuitem[count].y + yoffset, menuitem[count].textsize,
+                     menuitem[count].r, menuitem[count].g, menuitem[count].b, 1.0f);
+
+            if (menuinputcursorpos < (int)strlen(menuinput))
+              drawtext("/c", menuitem[count].x + xoffset + menuinputcursorpos * menuitem[count].textsize,
+                       menuitem[count].y + yoffset, menuitem[count].textsize, menuitem[count].r, menuitem[count].g,
+                       menuitem[count].b, 1.0f, menuinput[menuinputcursorpos]);
+
+            /* The selected row makes drawmenuitems() switch to font01, which
+               also has something at 0x82/0x83 - but the d-pad arrows only
+               exist in the port's own font00 atlas, so draw just these two
+               from texture 1000. */
+            fontnum = font.texturenum;
+            font.texturenum = 0;
+
+            drawtext("\x83", menuitem[count].x + xoffset + menuinputcursorpos * menuitem[count].textsize,
+                     menuitem[count].y + yoffset - menuitem[count].textsize, menuitem[count].textsize,
+                     menuitem[count].r, menuitem[count].g, menuitem[count].b, 0.8f);
+            drawtext("\x82", menuitem[count].x + xoffset + menuinputcursorpos * menuitem[count].textsize,
+                     menuitem[count].y + yoffset + menuitem[count].textsize, menuitem[count].textsize,
+                     menuitem[count].r, menuitem[count].g, menuitem[count].b, 0.8f);
+
+            font.texturenum = fontnum;
+          }
+#endif
         }
       }
     }
@@ -712,6 +752,257 @@ char *joylabel(int button)
   return "";
 }
 
+#ifdef __vita__
+
+/* The Vita has no keyboard, so string fields (player names, mappack names)
+   use the arcade high-score style entry instead of the typing path: the
+   character under the caret cycles through the printable part of the font
+   atlas, Up forwards and Down backwards, Left and Right move the caret and
+   Start accepts.
+
+   Only atlas glyphs can be produced, so there is nothing to validate on the
+   way in - the field can never hold a character the font cannot draw. */
+
+/* 0x20 (space) through 0x7A (z).  The cells after that in the atlas are the
+   empty ones, the braces and the solid block, so the run stops here. */
+static const char nameentrychars[] =
+    ".,-_!?'\"@#$&*+=()[]<>:;%^`\\ 1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/* Held directions, in the order up, down, left, right.  Cycling 91 glyphs one
+   press at a time is fine for a name, but not when the caret has to travel:
+   after 20 frames the direction repeats every 4th frame. */
+static const int nameentryalias[4] = {KEYALIAS_UP, KEYALIAS_DOWN, KEYALIAS_LEFT, KEYALIAS_RIGHT};
+static int nameentryheld[4];
+static int nameentryrepeat[4];
+
+/* Is the pad or the keyboard pushing one direction this frame? */
+static int nameentrydown(int dir)
+{
+  int pressed;
+
+  pressed = 0;
+
+  if (control[0].key[nameentryalias[dir]] != 0)
+    if (keyboard[control[0].key[nameentryalias[dir]]])
+      pressed = 1;
+
+  if (control[0].joysticknum != -1)
+  {
+    if (control[0].button[nameentryalias[dir]] != -1)
+      if (joystick[control[0].joysticknum].button[control[0].button[nameentryalias[dir]]])
+        pressed = 1;
+
+    if (dir == 0 && joystick[control[0].joysticknum].axis[1] >= 0.5f)
+      pressed = 1;
+    if (dir == 1 && joystick[control[0].joysticknum].axis[1] <= -0.5f)
+      pressed = 1;
+    if (dir == 2 && joystick[control[0].joysticknum].axis[0] <= -0.5f)
+      pressed = 1;
+    if (dir == 3 && joystick[control[0].joysticknum].axis[0] >= 0.5f)
+      pressed = 1;
+  }
+
+  return pressed;
+}
+
+static int nameentrylength(void) { return strlen(menuinput); }
+
+/* Step the glyph under the caret.  dir is +1 or -1. */
+static void nameentrycycle(int dir)
+{
+  int count;
+  int length;
+  int numofchars;
+
+  length = nameentrylength();
+
+  if (length == 0)
+  {
+    menuinput[0]        = 'A';
+    menuinput[1]        = 0;
+    menuinputcursorpos  = 0;
+    menuinputselectpos  = 0;
+    return;
+  }
+
+  if (menuinputcursorpos >= length)
+    menuinputcursorpos = length - 1;
+
+  numofchars = strlen(nameentrychars);
+
+  count = 0;
+  while (count < numofchars && nameentrychars[count] != menuinput[menuinputcursorpos])
+    count++;
+
+  count += dir;
+  if (count < 0)
+    count = numofchars - 1;
+  if (count >= numofchars)
+    count = 0;
+
+  menuinput[menuinputcursorpos] = nameentrychars[count];
+  menuinputselectpos            = menuinputcursorpos;
+}
+
+/* Move the caret one cell.  Stepping right off the end of the field starts a
+   new cell on "A", which is exactly what an empty cell shows. */
+static void nameentrymove(int dir)
+{
+  int length;
+
+  length = nameentrylength();
+
+  if (dir < 0)
+  {
+    if (menuinputcursorpos > 0)
+      menuinputcursorpos--;
+  }
+  else
+  {
+    if (menuinputcursorpos < length - 1)
+      menuinputcursorpos++;
+    else if (length < menuitem[currentmenuitem].sizex - 1)
+    {
+      menuinput[length]     = 'A';
+      menuinput[length + 1] = 0;
+      menuinputcursorpos    = length;
+    }
+  }
+
+  menuinputselectpos = menuinputcursorpos;
+}
+
+/* Select removes the character under the caret.  The caret only steps back
+   when nothing was left to its right, i.e. when the last letter was deleted;
+   otherwise the rest closes the gap and the caret stays where it is. */
+static void nameentrydelete(void)
+{
+  int count;
+  int length;
+
+  length = nameentrylength();
+  if (length == 0)
+    return;
+
+  if (menuinputcursorpos >= length)
+    menuinputcursorpos = length - 1;
+
+  for (count = menuinputcursorpos; count < length; count++)
+    menuinput[count] = menuinput[count + 1];
+
+  length--;
+
+  if (menuinputcursorpos > 0 && menuinputcursorpos >= length)
+    menuinputcursorpos--;
+
+  menuinputselectpos = menuinputcursorpos;
+}
+
+static void menunameentry(void)
+{
+  int count;
+  int length;
+  int pressed;
+
+  if (!menuitem[currentmenuitem].prevactive)
+  {
+    /* First frame: seed from what is stored.  A new slot is empty and starts
+       on "A"; an existing name starts on its last letter so it can grow. */
+    memset(menuinput, 0, 256);
+    strcpy(menuinput, menuitem[currentmenuitem].inputpointer);
+
+    length = nameentrylength();
+    if (length == 0)
+    {
+      strcpy(menuinput, "A");
+      menuinputcursorpos = 0;
+    }
+    else
+      menuinputcursorpos = length - 1;
+
+    menuinputselectpos = menuinputcursorpos;
+
+    for (count = 0; count < 4; count++)
+    {
+      nameentryheld[count]   = 0;
+      nameentryrepeat[count] = 0;
+    }
+
+    strcpy(menuitem[currentmenuitem].inputpointer, menuinput);
+    return;
+  }
+
+  for (count = 0; count < 4; count++)
+  {
+    pressed = nameentrydown(count);
+
+    if (!pressed)
+    {
+      nameentryheld[count]   = 0;
+      nameentryrepeat[count] = 0;
+      continue;
+    }
+
+    if (!nameentryheld[count])
+    {
+      nameentryheld[count]   = 1;
+      nameentryrepeat[count] = 0;
+    }
+    else
+    {
+      nameentryrepeat[count]++;
+      if (nameentryrepeat[count] <= 20 || nameentryrepeat[count] % 4 != 0)
+        continue;
+    }
+
+    /* Up and Down cycle the glyph, Left and Right move the caret. */
+    if (count == 0)
+      nameentrycycle(1);
+    else if (count == 1)
+      nameentrycycle(-1);
+    else
+      nameentrymove(count == 2 ? -1 : 1);
+  }
+
+  /* Start accepts the name. */
+  pressed = 0;
+  if (control[0].joysticknum != -1)
+    if (joystick[control[0].joysticknum].button[control[0].button[8]]
+        && !prevjoystick[control[0].joysticknum].button[control[0].button[8]])
+      pressed = 1;
+  if (keyboard[SCAN_ENTER] && !prevkeyboard[SCAN_ENTER])
+    pressed = 1;
+
+  if (pressed)
+  {
+    /* Cells the player cycled onto a space are padding, not part of the name. */
+    length = nameentrylength();
+    while (length > 0 && menuinput[length - 1] == ' ')
+      menuinput[--length] = 0;
+
+    count = 0;
+    while (menuinput[count] == ' ')
+      count++;
+    if (count > 0)
+      memmove(menuinput, menuinput + count, length - count + 1);
+
+    menuinputcursorpos = 0;
+    menuinputselectpos = 0;
+
+    menuitem[currentmenuitem].active = 0;
+  }
+
+  /* Select deletes the character under the caret. */
+  if (control[0].joysticknum != -1)
+    if (joystick[control[0].joysticknum].button[10]
+        && !prevjoystick[control[0].joysticknum].button[10])
+      nameentrydelete();
+
+  strcpy(menuitem[currentmenuitem].inputpointer, menuinput);
+}
+
+#endif /* __vita__ */
+
 void menutextbox(void)
 {
   int /*count,*/ count2, count3;
@@ -722,9 +1013,11 @@ void menutextbox(void)
   strcpy(menuinput, "Android");
 #endif
 #ifdef __vita__
-  // Android TextBox hack
-  menuitem[currentmenuitem].prevactive = 1;
-  strcpy(menuinput, "VITAPLAYER");
+  if (menuitem[currentmenuitem].inputtype == 3)
+  {
+    menunameentry();
+    return;
+  }
 #endif
   if (!menuitem[currentmenuitem].prevactive)
   {
