@@ -40,6 +40,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../game/level.h"
 #include "../game/mainmenu.h"
 #include "../game/music.h"
+#include "../game/options.h"
 #include "../game/player.h"
 #include "../game/replay.h"
 #include "../game/setup.h"
@@ -59,6 +60,7 @@ void playermenu(void)
 {
   int count, count2, count3;
   int deleteplayer;
+  int deletewait;
   int nameentrystarted;
 
   resetmenuitems();
@@ -66,6 +68,7 @@ void playermenu(void)
   joymenunum   = 1;
   playernum    = -1;
   deleteplayer = 0;
+  deletewait   = 0;
   nameentrystarted = 0;
 
   while (!menuitem[0].active && !windowinfo.shutdown)
@@ -76,8 +79,14 @@ void playermenu(void)
     numofmenuitems = 0;
     if (playernum == -1)
       nameentrystarted = 0;
-    createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
-    setmenuitem(MO_HOTKEY, SCAN_ESC);
+    /* The delete question is modal.  Back must not be offered there: leaving
+       with playernum still set would run the "cancel a new player" cleanup at
+       the bottom of this function and wipe the name being asked about. */
+    if (!deleteplayer || playernum == -1)
+    {
+      createmenuitem(TXT_BACK, 0, 0, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+      setmenuitem(MO_HOTKEY, SCAN_ESC);
+    }
 
     if (playernum == -1)
     {
@@ -138,8 +147,10 @@ void playermenu(void)
     checkjoystick();
     /* While the name field is open it reads the pad itself - Up and Down cycle
        the letter under the caret, Left and Right move it - so the menu must
-       not walk the list at the same time. */
-    if (numofmenuitems > 1 && menuitem[1].active && menuitem[1].type == 1)
+       not walk the list at the same time.  The same goes for the delete
+       question: Start answers it and must not also activate Back. */
+    if ((numofmenuitems > 1 && menuitem[1].active && menuitem[1].type == 1)
+        || (deleteplayer && playernum != -1))
     {
       nameentrystarted = 1;
       joystickmenu = 0;
@@ -214,8 +225,30 @@ void playermenu(void)
       if (!deleteplayer || player[playernum].name[0] == 0)
         drawtext(TXT_ENTER_NAME, (320 | TEXT_CENTER), 64, 16, 1.0f, 1.0f, 1.0f, 1.0f);
       else
+      {
+#ifdef __vita__
+        /* Pad answer instead of the keyboard one; the two buttons are in the
+           bottom legend. */
+        drawtext(TXT_DELETE_VITA, (320 | TEXT_CENTER), 64, 16, 1.0f, 1.0f, 1.0f, 1.0f, player[playernum].name);
+#else
         drawtext(TXT_DELETE_Y_N, (320 | TEXT_CENTER), 64, 16, 1.0f, 1.0f, 1.0f, 1.0f, player[playernum].name);
+#endif
+      }
     }
+
+#ifdef __vita__
+    /* Button legend along the very bottom.  The name editor, the delete
+       question and the list answer to different buttons, so it follows
+       whichever one is in front of the player.  The glyphs live in the port's
+       font00, not the data font that drawmenuitems() may have left selected. */
+    font.texturenum = 0;
+    if (numofmenuitems > 1 && menuitem[1].active && menuitem[1].type == 1)
+      drawtext("/s", (320 | TEXT_CENTER), 464, 16, 1.0f, 1.0f, 1.0f, 1.0f, TXT_HINT_NAMEENTRY);
+    else if (deleteplayer && playernum != -1)
+      drawtext("/s", (320 | TEXT_CENTER), 464, 16, 1.0f, 1.0f, 1.0f, 1.0f, TXT_HINT_DELETE);
+    else
+      drawtext("/s", (320 | TEXT_CENTER), 464, 16, 1.0f, 1.0f, 1.0f, 1.0f, TXT_HINT_PLAYERLIST);
+#endif
 
     drawmousecursor(768 + font.cursornum, mouse.x, mouse.y, 16, 1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -225,32 +258,64 @@ void playermenu(void)
     SDL_GL_SwapWindow(globalwindow);
 #endif
 
-    if (deleteplayer)
-      if (playernum != -1)
+    if (deleteplayer && playernum != -1)
+    {
+      if (player[playernum].name[0] == 0)
       {
-        if (player[playernum].name[0] == 0)
-          deleteplayer = 0;
-        else
+        deleteplayer = 0;
+        deletewait   = 0;
+      }
+#ifdef __vita__
+      else if (deletewait == 0)
+        /* The Start press that picked the slot must not also answer the
+           question it opens, so the first frame only arms it. */
+        deletewait = 1;
+      else if (control[0].joysticknum != -1)
+      {
+        if (joystick[control[0].joysticknum].button[control[0].button[8]]
+            && !prevjoystick[control[0].joysticknum].button[control[0].button[8]])
         {
-#ifdef GERMAN
-          if (keyboard[SCAN_J] || keyboard[SCAN_A])
+          memset(&player[playernum], 0, sizeof(player[playernum]));
+          playernum    = -1;
+          deleteplayer = 0;
+          deletewait   = 0;
+          resetmenuitems();
+        }
+        else if (joystick[control[0].joysticknum].numofbuttons > 10)
+          if (joystick[control[0].joysticknum].button[10]
+              && !prevjoystick[control[0].joysticknum].button[10])
+          {
+            playernum    = -1;
+            deleteplayer = 0;
+            deletewait   = 0;
+            resetmenuitems();
+          }
+      }
 #else
-          if (keyboard[SCAN_Y] || keyboard[SCAN_A])
+      else
+      {
+#ifdef GERMAN
+        if (keyboard[SCAN_J] || keyboard[SCAN_A])
+#else
+        if (keyboard[SCAN_Y] || keyboard[SCAN_A])
 #endif
-          {
-            memset(&player[playernum], 0, sizeof(player[playernum]));
-            playernum    = -1;
-            deleteplayer = 0;
-            resetmenuitems();
-          }
-          if (keyboard[SCAN_N] || keyboard[SCAN_ESC])
-          {
-            playernum    = -1;
-            deleteplayer = 0;
-            resetmenuitems();
-          }
+        {
+          memset(&player[playernum], 0, sizeof(player[playernum]));
+          playernum    = -1;
+          deleteplayer = 0;
+          resetmenuitems();
+        }
+        if (keyboard[SCAN_N] || keyboard[SCAN_ESC])
+        {
+          playernum    = -1;
+          deleteplayer = 0;
+          resetmenuitems();
         }
       }
+#endif
+    }
+    else
+      deletewait = 0;
 
     if (playernum != -1)
       if (player[playernum].name[0] != 0)

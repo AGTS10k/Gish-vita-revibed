@@ -422,6 +422,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define TXT_NEW_PLAYER "/i-New Player"
 #define TXT_CHOOSE_PLAYER "Choose Player"
 #define TXT_ENTER_NAME "Enter Name"
+/* Button legends along the bottom of the player screen.  0x80-0x8E are the
+   port's controller glyphs (left, right, down, up, ... Select, Start, d-pad),
+   so these are drawn with the app font, not the data one. */
+#define TXT_HINT_PLAYERLIST "\x8E Move   \x8D Choose"
+#define TXT_HINT_NAMEENTRY "\x83\x82 Letter  \x80\x81 Move  \x8C Delete  \x8D Confirm"
+/* Vita delete confirmation: pad answer shown under the question. */
+#define TXT_DELETE_VITA "Delete /s?"
+#define TXT_HINT_DELETE "\x8C Cancel   \x8D Confirm"
 #define TXT_DELETE_Y_N "Delete /s? (Y(A)//N)"
 #define TXT_COLLECTION_GAME "Collection Game"
 #define TXT_NEW_GAME "New Game"
