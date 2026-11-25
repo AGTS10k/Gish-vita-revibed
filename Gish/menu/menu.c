@@ -49,11 +49,17 @@ int joystickmenu = 1;
 
 int currentmenuitem;
 
+/* Set while a direction is being held.  The list steps on the press edge, so
+   a second direction arriving before the first is released would step it
+   again; this lock makes the next step wait for a full release. */
+static int menudirlatch;
+
 char keyboardlabel[323][16];
 
 void checkmenuitems(void)
 {
   int count, count2, count3;
+  int navheld;
 
   for (count = 0; count < numofmenuitems; count++)
     if ((mouse.lmb && !prevmouse.lmb) || menuitem[count].repeat)
@@ -165,6 +171,52 @@ void checkmenuitems(void)
         if (keyboard[control[0].key[KEYALIAS_RIGHT]] && !prevkeyboard[control[0].key[KEYALIAS_RIGHT]])
           count2 = 1;
       }
+
+      /* One step per direction press.  Rolling the analogue stick from Down
+         to Right crosses both axes, so the second direction reports a fresh
+         edge while the first is still held and would step the list again.
+         While any direction is held, only the first press may step; anything
+         that arrives before every direction is released is ignored.  This
+         tracks the inputs that can step the list, so the caret keys of an
+         open text box do not hold the latch. */
+      navheld = 0;
+      if (control[0].joysticknum != -1)
+      {
+        if (joystick[control[0].joysticknum].axis[0] >= 0.5f
+            || joystick[control[0].joysticknum].axis[0] <= -0.5f
+            || joystick[control[0].joysticknum].axis[1] >= 0.5f
+            || joystick[control[0].joysticknum].axis[1] <= -0.5f)
+          navheld = 1;
+
+        if (control[0].button[KEYALIAS_UP] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_UP]])
+            navheld = 1;
+        if (control[0].button[KEYALIAS_DOWN] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_DOWN]])
+            navheld = 1;
+        if (control[0].button[KEYALIAS_LEFT] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_LEFT]])
+            navheld = 1;
+        if (control[0].button[KEYALIAS_RIGHT] != -1)
+          if (joystick[control[0].joysticknum].button[control[0].button[KEYALIAS_RIGHT]])
+            navheld = 1;
+      }
+
+      if (keyboard[control[0].key[KEYALIAS_UP]] || keyboard[control[0].key[KEYALIAS_DOWN]])
+        navheld = 1;
+      if (!menuinputkeyboard
+          && (keyboard[control[0].key[KEYALIAS_LEFT]] || keyboard[control[0].key[KEYALIAS_RIGHT]]))
+        navheld = 1;
+
+      if (navheld)
+      {
+        if (menudirlatch)
+          count2 = 0;
+        else if (count2 != 0)
+          menudirlatch = 1;
+      }
+      else
+        menudirlatch = 0;
 
       joymenunum += count2;
 
