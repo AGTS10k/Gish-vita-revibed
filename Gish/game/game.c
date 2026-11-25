@@ -685,9 +685,20 @@ void gameloop(void)
     /* How far this frame is into the next simulation step, 0..1.  simtimer is
        the accumulator anchor, so (now - simtimer) is the leftover the loop
        above did not consume.  With the frame limiter on, the step and the frame
-       already happen together, so there is nothing to blend. */
+       already happen together, so there is nothing to blend.
+
+       Nothing may blend while the simulation is held.  The stepped positions
+       and the prev ones then both belong to the last step that ran, while the
+       accumulator keeps wrapping every step period, so the blend would slide
+       the camera and every object back and forth between those two positions -
+       a paused scene would jitter.  Pause, the in-game menu, the death and
+       level-complete fades (game.over/exit), the tutorial dialogs and the
+       "get ready" start delay all stop the step, so they draw at the stepped
+       position instead. */
     cameraalpha = 1.0f;
-    if (config.frameinterpolation && !config.fpslimiter && game.simspeed != 0)
+    if (config.frameinterpolation && !config.fpslimiter && game.simspeed != 0
+        && game.exit == GAMEEXIT_NONE && !game.pause && game.dialog == 0
+        && !game.over && game.startdelay == 0)
     {
       unsigned int elapsed = SDL_GetTicks() - simtimer;
 
