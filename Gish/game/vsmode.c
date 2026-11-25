@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../audio/audio.h"
 #include "../config.h"
+#include "../game/config.h"
 #include "../game/english.h"
 #include "../game/game.h"
 #include "../game/gameaudio.h"
@@ -45,6 +46,7 @@ void versusmodemenu(int versusnum)
 {
   int count;
   int unlocked;
+  int savedkeepaspect;
   char filename[32];
   bool is4Player;
   char *gametypeName;
@@ -217,9 +219,28 @@ void versusmodemenu(int versusnum)
     game.songnum = -1;
     checkmusic();
 
+    /* Versus maps are authored for the 4:3 playfield only; the tiles outside it
+       are filler, so expand mode has nothing to show there.  Force the 4:3
+       layout for the match while leaving the player's setting untouched, then
+       restore it afterwards so the menus still come back in expand mode.
+       keepaspect 0 (stretched) is left alone: its playfield is the whole
+       screen already. */
+    savedkeepaspect = config.keepaspect;
+    if (config.keepaspect == 2)
+    {
+      config.keepaspect = 1;
+      setupviewport();
+    }
+
     game.levelnum = 0;
     loadlevel(filename);
     gameloop();
+
+    if (config.keepaspect != savedkeepaspect)
+    {
+      config.keepaspect = savedkeepaspect;
+      setupviewport();
+    }
   }
 
   resetmenuitems();
