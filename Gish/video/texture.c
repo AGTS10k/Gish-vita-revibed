@@ -344,7 +344,11 @@ void loadtexturetgapartial(int texturenum, char *filename, int startx, int start
   int count, count2;
   int red, green, blue, alpha;
   int changeddir;
+  int bytesperpixel;
+  int width;
   unsigned char origin;
+  unsigned char *pixel;
+  unsigned char scanline[1024 * 4];
   FILE *fp;
 
   char filepath[256];
@@ -383,14 +387,26 @@ void loadtexturetgapartial(int texturenum, char *filename, int startx, int start
     fread2(&origin, 1, 1, fp);
     origin = (origin >> 4) & 3;
 
+    /* One fread per scanline instead of three fgetc() per pixel.  The old
+       loop made 1.44 million stdio calls for an 800x600 slide and was the
+       bulk of the stall when a story image was decoded. */
+    width         = tgaheader.imagewidth;
+    bytesperpixel = (tgaheader.pixeldepth == 32 ? 4 : 3);
+
     for (count = 0; count < tgaheader.imageheight; count++)
-      for (count2 = 0; count2 < tgaheader.imagewidth; count2++)
+    {
+      if (fread(scanline, bytesperpixel, width, fp) != (size_t)width)
+        break;
+
+      for (count2 = 0; count2 < width; count2++)
       {
-        blue  = fgetc(fp);
-        green = fgetc(fp);
-        red   = fgetc(fp);
-        if (tgaheader.pixeldepth == 32)
-          alpha = fgetc(fp);
+        pixel = scanline + count2 * bytesperpixel;
+
+        blue  = pixel[0];
+        green = pixel[1];
+        red   = pixel[2];
+        if (bytesperpixel == 4)
+          alpha = pixel[3];
         else
           alpha = 255;
 
@@ -427,6 +443,7 @@ void loadtexturetgapartial(int texturenum, char *filename, int startx, int start
                 = (red << 24) + (green << 16) + (blue << 8) + alpha;
         }
       }
+    }
 
     fclose(fp);
 
